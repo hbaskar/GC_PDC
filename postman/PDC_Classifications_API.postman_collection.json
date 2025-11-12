@@ -1,0 +1,982 @@
+{
+  "info": {
+    "name": "PDC Classifications & Lookup API",
+    "description": "Complete CRUD operations for PDC Classifications and Lookup API with comprehensive testing including batch operations. Updated for Azure Functions with /api/ prefix (v2.1.1)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.1.1"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:7071",
+      "type": "string"
+    },
+    {
+      "key": "classification_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "test_code",
+      "value": "TEST_{{$randomAlphaNumeric}}",
+      "type": "string"
+    },
+    {
+      "key": "lookup_type",
+      "value": "STATUS",
+      "type": "string"
+    },
+    {
+      "key": "lookup_code",
+      "value": "ACTIVE",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & Diagnostics",
+      "item": [
+        {
+          "name": "Basic Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Health check returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Health check has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('status');",
+                  "    pm.expect(responseJson).to.have.property('timestamp');",
+                  "    pm.expect(responseJson).to.have.property('service');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detailed Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Detailed health check returns 200 or 503', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 503]);",
+                  "});",
+                  "",
+                  "pm.test('Detailed health has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('status');",
+                  "    pm.expect(responseJson).to.have.property('timestamp');",
+                  "    pm.expect(responseJson).to.have.property('service');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health/detailed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "health",
+                "detailed"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Diagnostic Information",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Diagnostic endpoint returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Diagnostic has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('timestamp');",
+                  "    pm.expect(responseJson).to.have.property('environment');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/diagnostic",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "diagnostic"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Classifications",
+      "item": [
+        {
+          "name": "Get All Classifications",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get all classifications returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('items');",
+                  "    pm.expect(responseJson).to.have.property('total');",
+                  "    pm.expect(responseJson).to.have.property('page');",
+                  "    pm.expect(responseJson).to.have.property('size');",
+                  "    pm.expect(responseJson).to.have.property('pages');",
+                  "    pm.expect(responseJson.items).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Classifications have required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstItem = responseJson.items[0];",
+                  "        pm.expect(firstItem).to.have.property('classification_id');",
+                  "        pm.expect(firstItem).to.have.property('name');",
+                  "        pm.expect(firstItem).to.have.property('code');",
+                  "        ",
+                  "        // Store first classification ID for other tests",
+                  "        pm.collectionVariables.set('classification_id', firstItem.classification_id);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications?page=1&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Classification by ID",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Ensure we have a classification_id set",
+                  "const classificationId = pm.collectionVariables.get('classification_id');",
+                  "if (!classificationId) {",
+                  "    pm.collectionVariables.set('classification_id', '1'); // Default to ID 1",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get classification by ID returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Classification has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('classification_id');",
+                  "    pm.expect(responseJson).to.have.property('name');",
+                  "    pm.expect(responseJson).to.have.property('code');",
+                  "    pm.expect(responseJson).to.have.property('is_active');",
+                  "    pm.expect(responseJson).to.have.property('created_at');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications/{{classification_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications",
+                "{{classification_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create New Classification",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generate unique test code",
+                  "const testCode = 'TEST_' + Math.random().toString(36).substr(2, 9).toUpperCase();",
+                  "pm.collectionVariables.set('test_code', testCode);",
+                  "",
+                  "console.log('Creating classification with code:', testCode);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create classification returns 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Created classification has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('classification_id');",
+                  "    pm.expect(responseJson).to.have.property('name');",
+                  "    pm.expect(responseJson).to.have.property('code');",
+                  "    pm.expect(responseJson).to.have.property('created_at');",
+                  "    pm.expect(responseJson).to.have.property('created_by');",
+                  "    ",
+                  "    // Store created classification ID for update/delete tests",
+                  "    pm.collectionVariables.set('created_classification_id', responseJson.classification_id);",
+                  "});",
+                  "",
+                  "pm.test('Created classification has correct values', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const testCode = pm.collectionVariables.get('test_code');",
+                  "    ",
+                  "    pm.expect(responseJson.name).to.eql('Test Classification');",
+                  "    pm.expect(responseJson.code).to.eql(testCode);",
+                  "    pm.expect(responseJson.description).to.eql('Test classification for API testing');",
+                  "    pm.expect(responseJson.created_by).to.eql('api_test_user');",
+                  "    pm.expect(responseJson.is_active).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Classification\",\n  \"code\": \"{{test_code}}\",\n  \"description\": \"Test classification for API testing\",\n  \"retention_policy_id\": 1,\n  \"organization_id\": 1,\n  \"classification_level\": \"Public\",\n  \"sensitivity_rating\": 1,\n  \"is_active\": true,\n  \"created_by\": \"api_test_user\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/classifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Classification",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Ensure we have a created classification to update",
+                  "const createdId = pm.collectionVariables.get('created_classification_id');",
+                  "if (!createdId) {",
+                  "    console.log('No created classification ID found, using default ID 1');",
+                  "    pm.collectionVariables.set('created_classification_id', '1');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Update classification returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Updated classification has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('classification_id');",
+                  "    pm.expect(responseJson).to.have.property('name');",
+                  "    pm.expect(responseJson).to.have.property('description');",
+                  "    pm.expect(responseJson).to.have.property('modified_at');",
+                  "    pm.expect(responseJson).to.have.property('modified_by');",
+                  "});",
+                  "",
+                  "pm.test('Classification was updated correctly', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.name).to.eql('Updated Test Classification');",
+                  "    pm.expect(responseJson.description).to.eql('Updated description for testing');",
+                  "    pm.expect(responseJson.modified_by).to.eql('api_test_user');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Test Classification\",\n  \"description\": \"Updated description for testing\",\n  \"classification_level\": \"Internal\",\n  \"sensitivity_rating\": 2,\n  \"modified_by\": \"api_test_user\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/classifications/{{created_classification_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications",
+                "{{created_classification_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Classification (Soft)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Delete classification returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Delete response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('classification_id');",
+                  "    pm.expect(responseJson).to.have.property('is_deleted');",
+                  "    pm.expect(responseJson).to.have.property('deleted_at');",
+                  "    pm.expect(responseJson).to.have.property('deleted_by');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications/{{created_classification_id}}?deleted_by=api_test_user",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications",
+                "{{created_classification_id}}"
+              ],
+              "query": [
+                {
+                  "key": "deleted_by",
+                  "value": "api_test_user"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Restore Classification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Restore classification returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Restore response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('classification_id');",
+                  "    pm.expect(responseJson).to.have.property('is_deleted');",
+                  "    pm.expect(responseJson.is_deleted).to.be.false;",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restored_by\": \"api_test_user\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/classifications/{{created_classification_id}}/restore",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications",
+                "{{created_classification_id}}",
+                "restore"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lookups",
+      "item": [
+        {
+          "name": "Get All Lookup Types",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get lookup types returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('items');",
+                  "    pm.expect(responseJson).to.have.property('total');",
+                  "    pm.expect(responseJson).to.have.property('page');",
+                  "    pm.expect(responseJson).to.have.property('size');",
+                  "    pm.expect(responseJson).to.have.property('pages');",
+                  "    pm.expect(responseJson.items).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Lookup types have required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstItem = responseJson.items[0];",
+                  "        pm.expect(firstItem).to.have.property('lookup_type');",
+                  "        pm.expect(firstItem).to.have.property('display_name');",
+                  "        pm.expect(firstItem).to.have.property('is_active');",
+                  "        ",
+                  "        // Store lookup type for other tests",
+                  "        pm.collectionVariables.set('lookup_type', firstItem.lookup_type);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lookups/types?page=1&size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "lookups",
+                "types"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Specific Lookup Type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get lookup type returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Lookup type has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('lookup_type');",
+                  "    pm.expect(responseJson).to.have.property('display_name');",
+                  "    pm.expect(responseJson).to.have.property('description');",
+                  "    pm.expect(responseJson).to.have.property('is_active');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lookups/types/{{lookup_type}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "lookups",
+                "types",
+                "{{lookup_type}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Lookup Codes by Type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get lookup codes returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('items');",
+                  "    pm.expect(responseJson).to.have.property('total');",
+                  "    pm.expect(responseJson).to.have.property('lookup_type');",
+                  "    pm.expect(responseJson.items).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Lookup codes have required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstCode = responseJson.items[0];",
+                  "        pm.expect(firstCode).to.have.property('lookup_code');",
+                  "        pm.expect(firstCode).to.have.property('lookup_type');",
+                  "        pm.expect(firstCode).to.have.property('display_name');",
+                  "        pm.expect(firstCode).to.have.property('is_active');",
+                  "        ",
+                  "        // Store lookup code for other tests",
+                  "        pm.collectionVariables.set('lookup_code', firstCode.lookup_code);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lookups/codes/{{lookup_type}}?page=1&size=50",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "lookups",
+                "codes",
+                "{{lookup_type}}"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Summary Statistics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get lookup summary returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Summary has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('total_lookup_types');",
+                  "    pm.expect(responseJson).to.have.property('active_lookup_types');",
+                  "    pm.expect(responseJson).to.have.property('total_lookup_codes');",
+                  "    pm.expect(responseJson).to.have.property('active_lookup_codes');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lookups/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "lookups",
+                "summary"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Batch Lookups",
+      "item": [
+        {
+          "name": "Batch Lookup (POST)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Batch lookup POST returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Batch response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('lookup_types');",
+                  "    pm.expect(responseJson).to.have.property('requested_count');",
+                  "    pm.expect(responseJson).to.have.property('found_count');",
+                  "    pm.expect(responseJson).to.have.property('not_found');",
+                  "    pm.expect(responseJson).to.have.property('total_codes');",
+                  "    pm.expect(responseJson.lookup_types).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Batch lookup types have correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.lookup_types.length > 0) {",
+                  "        const firstType = responseJson.lookup_types[0];",
+                  "        pm.expect(firstType).to.have.property('lookup_type');",
+                  "        pm.expect(firstType).to.have.property('display_name');",
+                  "        pm.expect(firstType).to.have.property('codes');",
+                  "        pm.expect(firstType).to.have.property('code_count');",
+                  "        pm.expect(firstType.codes).to.be.an('array');",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lookup_types\": [\"STATUS\", \"PRIORITY\", \"CATEGORY\"],\n  \"active_only\": true,\n  \"include_inactive_types\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/lookups/batch/codes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "lookups",
+                "batch",
+                "codes"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Handling",
+      "item": [
+        {
+          "name": "404 - Non-existent Classification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Non-existent classification returns 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Error response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('error');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications/99999",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications",
+                "99999"
+              ]
+            }
+          }
+        },
+        {
+          "name": "404 - Non-existent Lookup Type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Non-existent lookup type returns 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Error response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('error');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lookups/types/NONEXISTENT",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "lookups",
+                "types",
+                "NONEXISTENT"
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 - Invalid Classification Data",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Invalid data returns 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('error');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"code\": \"\",\n  \"retention_policy_id\": \"invalid\",\n  \"organization_id\": \"not_a_number\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/classifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
