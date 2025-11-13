@@ -12,7 +12,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from database.config import get_db
-from services.pdc_service import PDCClassificationCRUD
+from services.classification_service import PDCClassificationService
 from sqlalchemy import text
 
 def test_connection():
@@ -65,33 +65,33 @@ def test_table_access():
         return False
 
 def test_crud_operations():
-    """Test CRUD operations using the service layer."""
+    """Test service operations using the service layer."""
     try:
-        print("🔧 Testing CRUD operations...")
+        print("🔧 Testing service operations...")
         db = next(get_db())
-        crud = PDCClassificationCRUD(db)
+        service = PDCClassificationService(db)
         
         # Test get_all
-        classifications, total = crud.get_all(limit=5)
+        classifications, total = service.get_all(limit=5)
         print(f"✅ get_all(): Found {total} total records, retrieved {len(classifications)}")
         
         if classifications:
             first_record = classifications[0]
             
             # Test get_by_id
-            retrieved = crud.get_by_id(first_record.classification_id)
+            retrieved = service.get_by_id(first_record.classification_id)
             if retrieved:
                 print(f"✅ get_by_id(): Retrieved '{retrieved.name}' (ID: {retrieved.classification_id})")
             
             # Test get_by_code
-            retrieved_by_code = crud.get_by_code(first_record.code)
+            retrieved_by_code = service.get_by_code(first_record.code)
             if retrieved_by_code:
                 print(f"✅ get_by_code(): Retrieved '{retrieved_by_code.name}' (Code: {retrieved_by_code.code})")
         
         return True
         
     except Exception as e:
-        print(f"❌ Error testing CRUD operations: {e}")
+        print(f"❌ Error testing service operations: {e}")
         return False
 
 def test_metadata_operations():
@@ -99,13 +99,13 @@ def test_metadata_operations():
     try:
         print("📊 Testing metadata operations...")
         db = next(get_db())
-        crud = PDCClassificationCRUD(db)
+        service = PDCClassificationService(db)
         
         # Test metadata methods
-        levels = crud.get_classification_levels()
-        media_types = crud.get_media_types()
-        file_types = crud.get_file_types()
-        series = crud.get_series()
+        levels = service.get_classification_levels()
+        media_types = service.get_media_types()
+        file_types = service.get_file_types()
+        series = service.get_series()
         
         print(f"✅ Classification levels: {levels[:3]}{'...' if len(levels) > 3 else ''}")
         print(f"✅ Media types: {media_types[:3]}{'...' if len(media_types) > 3 else ''}")
@@ -134,7 +134,7 @@ def main():
     if not test_table_access():
         success = False
     
-    # Test 3: CRUD Operations
+    # Test 3: service Operations
     if not test_crud_operations():
         success = False
     

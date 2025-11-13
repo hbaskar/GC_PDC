@@ -11,7 +11,8 @@ from pydantic import ValidationError
 # Import dependencies
 from database.config import get_db
 from models import PDCLookupType, PDCLookupCode
-from services.lookup_service import PDCLookupService
+from services.lookup_service import PDCLookupService, LookupPaginationQueryParser
+
 from schemas.lookup_schemas import (
     PDCLookupTypeResponse,
     PDCLookupTypeWithCodes,
@@ -19,7 +20,7 @@ from schemas.lookup_schemas import (
     PDCLookupCodeResponse,
     PDCLookupCodeSummary
 )
-from schemas.pdc_schemas import ErrorResponse
+from schemas.classification_schemas import ErrorResponse
 
 # Create blueprint
 bp = func.Blueprint()
@@ -148,21 +149,17 @@ def get_lookup_type(req: func.HttpRequest) -> func.HttpResponse:
 
 @bp.route(route="lookups/codes/{lookup_type}", methods=["GET"])
 def get_lookup_codes_by_type(req: func.HttpRequest) -> func.HttpResponse:
-    """Get all lookup codes for a specific type."""
+    """Get all lookup codes for a specific type with advanced pagination."""
     try:
         lookup_type = req.route_params.get('lookup_type')
-        page = int(req.params.get('page', 1))
-        size = int(req.params.get('size', 100))  # Higher default for codes
-        active_only = req.params.get('active_only', 'true').lower() == 'true'
         
         if not lookup_type:
             return create_error_response("Lookup type is required", 400)
         
-        # Validate pagination
-        if page < 1 or size < 1 or size > 200:
-            return create_error_response("Invalid pagination parameters", 400)
+        # Parse query parameters for enhanced pagination
+        request_params = dict(req.params)
         
-        # Get database connection and service
+        # Get database connection
         db = next(get_db())
         lookup_service = PDCLookupService(db)
         
@@ -170,37 +167,67 @@ def get_lookup_codes_by_type(req: func.HttpRequest) -> func.HttpResponse:
         if not lookup_service.get_lookup_type(lookup_type):
             return create_error_response("Lookup type not found", 404)
         
-        # Get lookup codes
-        lookup_codes = lookup_service.get_lookup_codes_by_type(
-            lookup_type,
-            active_only=active_only,
-            skip=(page - 1) * size,
-            limit=size
+        # Parse pagination parameters
+        pagination = LookupPaginationQueryParser.parse_pagination_params(request_params)
+        
+        # Get search and other parameters
+        search = request_params.get('search', '').strip() or None
+        include_deleted = request_params.get('include_deleted', 'false').lower() in ('true', '1', 'yes')
+        
+        # Get paginated results  
+        result = lookup_service.get_by_type_paginated(
+            lookup_type=lookup_type,
+            pagination=pagination,
+            search=search,
+            include_inactive=include_deleted
         )
         
-        total = lookup_service.count_lookup_codes_by_type(lookup_type, active_only=active_only)
+        # Add lookup_type to response metadata
+        result['lookup_type'] = lookup_type
         
-        # Convert to response format
-        items = [
-            PDCLookupCodeResponse.model_validate(code).model_dump()
-            for code in lookup_codes
-        ]
-        
-        # Create paginated response
-        pages = math.ceil(total / size) if size > 0 else 0
-        response_data = {
-            "items": items,
-            "total": total,
-            "page": page,
-            "size": size,
-            "pages": pages,
-            "lookup_type": lookup_type
-        }
-        
-        return create_success_response(response_data)
+        return create_success_response(result)
         
     except Exception as e:
         logging.error(f"Get lookup codes failed: {str(e)}")
+        return create_error_response("Failed to retrieve lookup codes", 500, str(e))
+
+@bp.route(route="lookups/codes", methods=["GET"])
+def get_all_lookup_codes(req: func.HttpRequest) -> func.HttpResponse:
+    """Get all lookup codes with advanced pagination and filtering."""
+    try:
+        # Parse query parameters for enhanced pagination
+        request_params = dict(req.params)
+        
+        # Get database connection
+        db = next(get_db())
+        lookup_service = PDCLookupService(db)
+        
+        # Parse pagination parameters
+        pagination = LookupPaginationQueryParser.parse_pagination_params(request_params)
+        
+        # Parse filter parameters
+        filters = LookupPaginationQueryParser.parse_filter_params(request_params)
+        
+        # Get search and other parameters
+        search = request_params.get('search', '').strip() or None
+        include_deleted = request_params.get('include_deleted', 'false').lower() in ('true', '1', 'yes')
+        
+        # Use legacy active_only parameter if provided
+        if 'active_only' in request_params and 'is_active' not in filters:
+            filters['is_active'] = request_params['active_only'].lower() in ('true', '1', 'yes')
+        
+        # Get paginated results
+        result = lookup_service.get_lookup_codes_paginated(
+            pagination=pagination,
+            filters=filters,
+            search=search,
+            include_inactive=include_deleted
+        )
+        
+        return create_success_response(result)
+        
+    except Exception as e:
+        logging.error(f"Get all lookup codes failed: {str(e)}")
         return create_error_response("Failed to retrieve lookup codes", 500, str(e))
 
 @bp.route(route="lookups/batch/codes", methods=["POST"])

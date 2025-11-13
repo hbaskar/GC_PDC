@@ -22,10 +22,10 @@ gc_pdc/
 │   └── models.py          # SQLAlchemy models
 ├── schemas/
 │   ├── __init__.py
-│   └── pdc_schemas.py     # Pydantic schemas for validation
+│   └── classification_schemas.py     # Pydantic schemas for validation
 ├── services/
 │   ├── __init__.py
-│   └── pdc_service.py     # CRUD operations service
+│   └── classification_service.py     # CRUD operations service
 ├── scripts/               # Database utilities and maintenance scripts
 │   ├── __init__.py
 │   ├── README.md          # Scripts documentation
@@ -299,37 +299,82 @@ CREATE INDEX IX_pdc_classifications_category ON pdc_classifications(category);
 
 ## Testing
 
-### Database and Service Layer Tests
+### 🏗️ Architecture & Feature Tests
 ```bash
-# Run comprehensive database tests
-python tests/test_db.py
+# Test unified service architecture
+python test_lookup_unification.py
+python test_template_name.py
+
+# Test blueprint architecture
+python test_blueprints.py
+
+# Test Postman collection compatibility 
+python test_postman_compatibility.py
 ```
 
-### API Endpoint Testing
-Use the comprehensive Postman collection provided in the `/postman` directory:
+### 🗄️ Database and Service Layer Tests
+```bash
+# Run formal database tests
+python -m pytest tests/
 
-1. **Import Collection**: Import `PDC_Classifications_API.postman_collection.json`
+# Run comprehensive database tests
+python tests/test_db.py
+
+# Test unified services
+python scripts/test_lookup_service.py
+python scripts/test_database_connection.py
+```
+
+### 🌐 API Endpoint Testing
+Use the comprehensive Postman collection v4.0.0 provided in the `/postman` directory:
+
+1. **Import Collection**: Import `PDC_Classifications_API.postman_collection.json` (v4.0.0)
 2. **Import Environment**: Import `PDC_Classifications.postman_environment.json` 
 3. **Run Tests**: Execute individual tests or run entire collection
-4. **View Results**: See detailed test results with 44 comprehensive validations
+4. **View Results**: See detailed test results with 97+ comprehensive validations including template name testing
+
+**Key v4.0.0 Features:**
+- ✅ Template name validation in classification responses
+- ✅ Unified service architecture compatibility testing
+- ✅ Advanced pagination with both offset and cursor support
+- ✅ Batch lookup operations testing
 
 **Alternative: Manual Testing**
 ```bash
 # Health check
 curl "http://localhost:7071/api/health"
 
-# Get all classifications
+# Get all classifications (with template names)
 curl "http://localhost:7071/api/classifications"
 
 # Get specific classification
 curl "http://localhost:7071/api/classifications/1"
+
+# Test advanced pagination
+curl "http://localhost:7071/api/classifications?page=1&size=10&sort_by=name"
 ```
 
-### Available Test Suites
+### 📊 Test Suite Organization
 
-- **📁 `/tests`**: Database connectivity, CRUD operations, service layer validation
-- **📁 `/postman`**: Complete API endpoint testing with 12 test scenarios  
-- **📁 `/scripts`**: Database inspection and maintenance utilities
+- **📋 **Root Directory**: Major feature and architecture tests**
+  - `test_template_name.py` - Template name functionality 
+  - `test_lookup_unification.py` - Unified service architecture
+  - `test_postman_compatibility.py` - API compatibility testing
+  - `test_blueprints.py` - Blueprint architecture validation
+
+- **� `/tests`**: Formal test suite for CI/CD integration**
+  - Database connectivity and service layer validation
+  - Pytest-compatible test structure
+
+- **📁 `/postman`**: Complete API endpoint testing (v4.0.0)**
+  - 97+ test scenarios with unified architecture support
+  - Template name feature validation
+  - Advanced pagination testing
+
+- **�️ `/scripts`**: Development and debugging tests**
+  - Service operation testing
+  - Database inspection utilities
+  - Authentication method validation
 
 ### Authentication Testing
 ```bash

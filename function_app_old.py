@@ -334,7 +334,7 @@ def get_classifications_by_organization(req: func.HttpRequest) -> func.HttpRespo
         classifications = crud.get_by_organization(organization_id, is_active)
         
         # Convert to summary format for better performance
-        from schemas.pdc_schemas import PDCClassificationSummary
+        from schemas.classification_schemas import PDCClassificationSummary
         classification_responses = [
             PDCClassificationSummary.model_validate(classification).model_dump()
             for classification in classifications
@@ -369,7 +369,7 @@ def get_classifications_by_sensitivity(req: func.HttpRequest) -> func.HttpRespon
         classifications = crud.get_by_sensitivity_rating(min_rating, max_rating)
         
         # Convert to summary format
-        from schemas.pdc_schemas import PDCClassificationSummary
+        from schemas.classification_schemas import PDCClassificationSummary
         classification_responses = [
             PDCClassificationSummary.model_validate(classification).model_dump()
             for classification in classifications

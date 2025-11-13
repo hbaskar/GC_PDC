@@ -133,7 +133,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from database.config import get_db
-from services.pdc_service import PDCClassificationCRUD
+from services.unified_classification_service import PDCClassificationService
 
 def test_function_name():
     """Test specific functionality."""

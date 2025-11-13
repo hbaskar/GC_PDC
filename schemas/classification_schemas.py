@@ -86,6 +86,9 @@ class PDCClassificationResponse(PDCClassificationBase):
     last_accessed_at: Optional[datetime] = None
     last_accessed_by: Optional[str] = None
     
+    # Resolved relationship data
+    template_name: Optional[str] = Field(None, description="Template name (resolved from template_id)")
+    
     model_config = {"from_attributes": True}
 
 class PDCClassificationList(BaseModel):
@@ -104,6 +107,7 @@ class PDCClassificationSummary(BaseModel):
     classification_level: Optional[str] = None
     sensitivity_rating: Optional[int] = None
     is_active: bool = True
+    template_name: Optional[str] = Field(None, description="Template name (resolved from template_id)")
     
     model_config = {"from_attributes": True}
 

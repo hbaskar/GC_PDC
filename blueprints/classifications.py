@@ -11,14 +11,15 @@ from pydantic import ValidationError
 # Import dependencies
 from database.config import get_db
 from models import PDCClassification
-from services.pdc_service import PDCClassificationCRUD
-from schemas.pdc_schemas import (
+from services.classification_service import PDCClassificationService, PaginationQueryParser
+from schemas.classification_schemas import (
     PDCClassificationCreate, 
     PDCClassificationUpdate, 
     PDCClassificationResponse,
     PDCClassificationSummary,
     ErrorResponse
 )
+import json
 
 # Create blueprint
 bp = func.Blueprint()
@@ -46,6 +47,72 @@ def create_success_response(data: dict, status_code: int = 200) -> func.HttpResp
     )
 
 @bp.route(route="classifications", methods=["GET"])
+def get_all_classifications(req: func.HttpRequest) -> func.HttpResponse:
+    """Get all PDC classifications with advanced pagination."""
+    try:
+        db = next(get_db())
+        service = PDCClassificationService(db)
+        
+        # Parse query parameters
+        request_params = dict(req.params)
+        
+        # Parse pagination parameters
+        pagination = PaginationQueryParser.parse_pagination_params(request_params)
+        
+        # Parse filter parameters
+        filters = PaginationQueryParser.parse_filter_params(request_params)
+        
+        # Get search parameter
+        search = request_params.get('search', '').strip() or None
+        include_deleted = request_params.get('include_deleted', 'false').lower() in ('true', '1', 'yes')
+        
+        # Get paginated results
+        result = service.get_all_paginated(
+            pagination=pagination,
+            filters=filters,
+            search=search,
+            include_deleted=include_deleted
+        )
+        
+        return func.HttpResponse(
+            json.dumps(result, default=str),
+            status_code=200,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        logging.error(f"Error getting classifications: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({"error": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )
+
+@bp.route(route="classifications/summary", methods=["GET"])
+def get_classifications_summary(req: func.HttpRequest) -> func.HttpResponse:
+    """Get summary statistics for PDC classifications."""
+    try:
+        db = next(get_db())
+        service = PDCClassificationService(db)
+        
+        # Parse query parameters for filtering
+        request_params = dict(req.params)
+        filters = PaginationQueryParser.parse_filter_params(request_params)
+        
+        # Get summary
+        summary = service.get_summary_statistics(filters)
+        
+        return func.HttpResponse(
+            json.dumps(summary, default=str),
+            status_code=200,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        logging.error(f"Error getting classifications summary: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({"error": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )
 def get_classifications(req: func.HttpRequest) -> func.HttpResponse:
     """Get all classifications with optional filtering and pagination."""
     try:
@@ -61,10 +128,10 @@ def get_classifications(req: func.HttpRequest) -> func.HttpResponse:
         
         # Get database connection and service
         db = next(get_db())
-        crud = PDCClassificationCRUD(db)
+        service = PDCClassificationService(db)
         
         # Get classifications with filtering
-        classifications, total = crud.get_all(
+        classifications, total = service.get_all(
             skip=(page - 1) * size,
             limit=size,
             search=search,
@@ -102,14 +169,16 @@ def get_classification(req: func.HttpRequest) -> func.HttpResponse:
         
         # Get database connection and service
         db = next(get_db())
-        crud = PDCClassificationCRUD(db)
+        service = PDCClassificationService(db)
         
         # Get classification
-        classification = crud.get_by_id(classification_id)
+        classification = service.get_by_id(classification_id)
         if not classification:
             return create_error_response("Classification not found", 404)
         
-        response_data = PDCClassificationResponse.model_validate(classification).model_dump()
+        # Enrich with template data and serialize
+        enriched_data = service._enrich_classification_with_template(classification)
+        response_data = PDCClassificationResponse.model_validate(enriched_data).model_dump()
         return create_success_response(response_data)
         
     except ValueError:
@@ -139,10 +208,10 @@ def create_classification(req: func.HttpRequest) -> func.HttpResponse:
         
         # Get database connection and service
         db = next(get_db())
-        crud = PDCClassificationCRUD(db)
+        service = PDCClassificationService(db)
         
         # Create classification
-        new_classification = crud.create(classification_data)
+        new_classification = service.create(classification_data)
         
         response_data = PDCClassificationResponse.model_validate(new_classification).model_dump()
         return create_success_response(response_data, 201)
@@ -174,10 +243,10 @@ def update_classification(req: func.HttpRequest) -> func.HttpResponse:
         
         # Get database connection and service
         db = next(get_db())
-        crud = PDCClassificationCRUD(db)
+        service = PDCClassificationService(db)
         
         # Update classification
-        updated_classification = crud.update(classification_id, classification_data)
+        updated_classification = service.update(classification_id, classification_data)
         if not updated_classification:
             return create_error_response("Classification not found", 404)
         
@@ -201,10 +270,10 @@ def delete_classification(req: func.HttpRequest) -> func.HttpResponse:
         
         # Get database connection and service
         db = next(get_db())
-        crud = PDCClassificationCRUD(db)
+        service = PDCClassificationService(db)
         
         # Soft delete classification
-        deleted_classification = crud.soft_delete(classification_id, deleted_by)
+        deleted_classification = service.soft_delete(classification_id, deleted_by)
         if not deleted_classification:
             return create_error_response("Classification not found or already deleted", 404)
         
@@ -229,10 +298,10 @@ def restore_classification(req: func.HttpRequest) -> func.HttpResponse:
         
         # Get database connection and service
         db = next(get_db())
-        crud = PDCClassificationCRUD(db)
+        service = PDCClassificationService(db)
         
         # Restore classification
-        restored_classification = crud.restore(classification_id, restored_by)
+        restored_classification = service.restore(classification_id, restored_by)
         if not restored_classification:
             return create_error_response("Classification not found or not deleted", 404)
         

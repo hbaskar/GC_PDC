@@ -1,6 +1,6 @@
 # Schemas package
 
-from .pdc_schemas import (
+from .classification_schemas import (
     PDCClassificationCreate,
     PDCClassificationUpdate,
     PDCClassificationResponse,

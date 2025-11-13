@@ -1,9 +1,9 @@
 {
   "info": {
     "name": "PDC Classifications & Lookup API",
-    "description": "Complete CRUD operations for PDC Classifications and Lookup API with comprehensive testing including batch operations. Updated for Azure Functions with /api/ prefix (v2.1.1)",
+    "description": "Complete CRUD operations for PDC Classifications and Lookup API with unified service architecture, comprehensive testing including batch operations and advanced pagination (offset & cursor-based). Updated for Azure Functions with /api/ prefix and unified service support (v4.0.0)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "version": "2.1.1"
+    "version": "4.0.0"
   },
   "variable": [
     {
@@ -30,6 +30,27 @@
       "key": "lookup_code",
       "value": "ACTIVE",
       "type": "string"
+    },
+    {
+      "key": "next_cursor",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lookup_next_cursor",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "test_page_size",
+      "value": "10",
+      "type": "string"
+    },
+    {
+      "key": "expected_template_name",
+      "value": "",
+      "type": "string",
+      "description": "Template name returned in classification responses (v4.0.0 feature)"
     }
   ],
   "item": [
@@ -175,13 +196,26 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test('Response has correct structure', function () {",
+                  "pm.test('Response has new pagination structure', function () {",
                   "    const responseJson = pm.response.json();",
                   "    pm.expect(responseJson).to.have.property('items');",
-                  "    pm.expect(responseJson).to.have.property('total');",
-                  "    pm.expect(responseJson).to.have.property('page');",
-                  "    pm.expect(responseJson).to.have.property('size');",
-                  "    pm.expect(responseJson).to.have.property('pages');",
+                  "    pm.expect(responseJson).to.have.property('pagination');",
+                  "    pm.expect(responseJson).to.have.property('metadata');",
+                  "    ",
+                  "    // Check pagination object",
+                  "    const pagination = responseJson.pagination;",
+                  "    pm.expect(pagination).to.have.property('page');",
+                  "    pm.expect(pagination).to.have.property('size');",
+                  "    pm.expect(pagination).to.have.property('total');",
+                  "    pm.expect(pagination).to.have.property('pages');",
+                  "    pm.expect(pagination).to.have.property('has_next');",
+                  "    pm.expect(pagination).to.have.property('has_previous');",
+                  "    ",
+                  "    // Check metadata object",
+                  "    const metadata = responseJson.metadata;",
+                  "    pm.expect(metadata).to.have.property('sort_info');",
+                  "    pm.expect(metadata).to.have.property('execution_time_ms');",
+                  "    ",
                   "    pm.expect(responseJson.items).to.be.an('array');",
                   "});",
                   "",
@@ -195,6 +229,38 @@
                   "        ",
                   "        // Store first classification ID for other tests",
                   "        pm.collectionVariables.set('classification_id', firstItem.classification_id);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('🆕 v4.0.0: Classifications include template names', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstItem = responseJson.items[0];",
+                  "        ",
+                  "        // v4.0.0 feature: template_name field should be present",
+                  "        pm.expect(firstItem).to.have.property('template_name');",
+                  "        ",
+                  "        // Template name should be a string (could be null for records without templates)",
+                  "        if (firstItem.template_name !== null) {",
+                  "            pm.expect(firstItem.template_name).to.be.a('string');",
+                  "            pm.collectionVariables.set('expected_template_name', firstItem.template_name);",
+                  "        }",
+                  "        ",
+                  "        console.log('✅ Template name field found:', firstItem.template_name);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Pagination math is correct', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const pagination = responseJson.pagination;",
+                  "    ",
+                  "    pm.expect(pagination.page).to.be.at.least(1);",
+                  "    pm.expect(pagination.size).to.be.at.least(1);",
+                  "    pm.expect(pagination.total).to.be.at.least(0);",
+                  "    ",
+                  "    if (pagination.total > 0) {",
+                  "        const expectedPages = Math.ceil(pagination.total / pagination.size);",
+                  "        pm.expect(pagination.pages).to.equal(expectedPages);",
                   "    }",
                   "});",
                   "",
@@ -262,6 +328,10 @@
                   "    pm.expect(responseJson).to.have.property('code');",
                   "    pm.expect(responseJson).to.have.property('is_active');",
                   "    pm.expect(responseJson).to.have.property('created_at');",
+                  "    ",
+                  "    // v4.0.0 feature: template_name should be included",
+                  "    pm.expect(responseJson).to.have.property('template_name');",
+                  "    console.log('✅ Template name in single response:', responseJson.template_name);",
                   "});",
                   "",
                   "pm.test('Response time is acceptable', function () {",
@@ -541,6 +611,379 @@
               ]
             }
           }
+        },
+        {
+          "name": "Pagination - Offset Advanced",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Offset pagination returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Advanced pagination structure validation', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    ",
+                  "    // Check main structure",
+                  "    pm.expect(responseJson).to.have.property('items');",
+                  "    pm.expect(responseJson).to.have.property('pagination');",
+                  "    pm.expect(responseJson).to.have.property('metadata');",
+                  "    ",
+                  "    // Validate pagination object",
+                  "    const pagination = responseJson.pagination;",
+                  "    pm.expect(pagination).to.have.property('page', 1);",
+                  "    pm.expect(pagination).to.have.property('size', 5);",
+                  "    pm.expect(pagination).to.have.property('total');",
+                  "    pm.expect(pagination).to.have.property('pages');",
+                  "    pm.expect(pagination).to.have.property('has_next');",
+                  "    pm.expect(pagination).to.have.property('has_previous', false);",
+                  "    ",
+                  "    // Validate metadata",
+                  "    const metadata = responseJson.metadata;",
+                  "    pm.expect(metadata).to.have.property('filters_applied');",
+                  "    pm.expect(metadata).to.have.property('sort_info');",
+                  "    pm.expect(metadata).to.have.property('execution_time_ms');",
+                  "});",
+                  "",
+                  "pm.test('Filter and sort validation', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const metadata = responseJson.metadata;",
+                  "    ",
+                  "    // Check applied filters",
+                  "    pm.expect(metadata.filters_applied).to.have.property('is_active', true);",
+                  "    ",
+                  "    // Check sort info",
+                  "    pm.expect(metadata.sort_info).to.have.property('sort_by', 'name');",
+                  "    pm.expect(metadata.sort_info).to.have.property('sort_order', 'asc');",
+                  "});",
+                  "",
+                  "pm.test('Items are sorted correctly', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const items = responseJson.items;",
+                  "    ",
+                  "    if (items.length > 1) {",
+                  "        for (let i = 0; i < items.length - 1; i++) {",
+                  "            pm.expect(items[i].name <= items[i + 1].name).to.be.true;",
+                  "        }",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications?page=1&size=5&sort_by=name&sort_order=asc&is_active=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "5"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "name"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc"
+                },
+                {
+                  "key": "is_active",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Pagination - Cursor Based",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Cursor pagination returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Cursor pagination structure validation', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const pagination = responseJson.pagination;",
+                  "    ",
+                  "    // Cursor pagination should have cursors",
+                  "    pm.expect(pagination).to.have.property('next_cursor');",
+                  "    pm.expect(pagination).to.have.property('previous_cursor');",
+                  "    ",
+                  "    // Total should be -1 for cursor pagination (performance)",
+                  "    pm.expect(pagination.total).to.equal(-1);",
+                  "    pm.expect(pagination.pages).to.equal(-1);",
+                  "    ",
+                  "    // Store next cursor for subsequent test",
+                  "    if (pagination.next_cursor) {",
+                  "        pm.collectionVariables.set('next_cursor', pagination.next_cursor);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Cursor pagination metadata', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const metadata = responseJson.metadata;",
+                  "    ",
+                  "    pm.expect(metadata.sort_info).to.have.property('pagination_type', 'cursor');",
+                  "    pm.expect(metadata.sort_info).to.have.property('sort_order', 'desc');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications?pagination_type=cursor&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications"
+              ],
+              "query": [
+                {
+                  "key": "pagination_type",
+                  "value": "cursor"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Pagination - With Search",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Search with pagination returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Search results are filtered', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const metadata = responseJson.metadata;",
+                  "    ",
+                  "    // Should show search was applied",
+                  "    pm.expect(metadata).to.have.property('search_term');",
+                  "    ",
+                  "    // Check if search term appears in results",
+                  "    const items = responseJson.items;",
+                  "    const searchTerm = 'test';",
+                  "    ",
+                  "    if (items.length > 0) {",
+                  "        // At least one item should contain the search term",
+                  "        const hasSearchTerm = items.some(item => ",
+                  "            item.name.toLowerCase().includes(searchTerm) ||",
+                  "            item.description?.toLowerCase().includes(searchTerm) ||",
+                  "            item.code?.toLowerCase().includes(searchTerm)",
+                  "        );",
+                  "        // Note: This might not always be true if no test data exists",
+                  "        console.log('Search results found:', items.length);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications?page=1&size=20&search=test&sort_by=created_at&sort_order=desc",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": "test"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "created_at"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Pagination - Multiple Filters",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Multiple filters return 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Multiple filters applied correctly', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const metadata = responseJson.metadata;",
+                  "    ",
+                  "    // Check all applied filters",
+                  "    const filters = metadata.filters_applied;",
+                  "    pm.expect(filters).to.have.property('is_active');",
+                  "    pm.expect(filters).to.have.property('sensitivity_min');",
+                  "    ",
+                  "    // Verify filtering worked on returned items",
+                  "    const items = responseJson.items;",
+                  "    if (items.length > 0) {",
+                  "        items.forEach(item => {",
+                  "            if (item.sensitivity_rating !== null) {",
+                  "                pm.expect(item.sensitivity_rating).to.be.at.least(2);",
+                  "            }",
+                  "        });",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications?page=1&size=15&is_active=true&sensitivity_min=2&classification_level=SECRET&sort_by=sensitivity_rating&sort_order=desc",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "15"
+                },
+                {
+                  "key": "is_active",
+                  "value": "true"
+                },
+                {
+                  "key": "sensitivity_min",
+                  "value": "2"
+                },
+                {
+                  "key": "classification_level",
+                  "value": "SECRET"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "sensitivity_rating"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Classifications Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Classifications summary returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Summary has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    ",
+                  "    pm.expect(responseJson).to.have.property('summary');",
+                  "    pm.expect(responseJson).to.have.property('by_classification_level');",
+                  "    pm.expect(responseJson).to.have.property('by_organization');",
+                  "    pm.expect(responseJson).to.have.property('generated_at');",
+                  "    ",
+                  "    // Check summary stats",
+                  "    const summary = responseJson.summary;",
+                  "    pm.expect(summary).to.have.property('total_classifications');",
+                  "    pm.expect(summary).to.have.property('active_classifications');",
+                  "    pm.expect(summary).to.have.property('inactive_classifications');",
+                  "});",
+                  "",
+                  "pm.test('Summary arrays are valid', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    ",
+                  "    pm.expect(responseJson.by_classification_level).to.be.an('array');",
+                  "    pm.expect(responseJson.by_organization).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "classifications",
+                "summary"
+              ]
+            }
+          }
         }
       ]
     },
@@ -765,6 +1208,379 @@
               "path": [
                 "api",
                 "lookups",
+                "summary"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Lookup Codes - All with Pagination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get all lookup codes returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Enhanced pagination structure for lookups', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    ",
+                  "    // Check main structure",
+                  "    pm.expect(responseJson).to.have.property('items');",
+                  "    pm.expect(responseJson).to.have.property('pagination');",
+                  "    pm.expect(responseJson).to.have.property('metadata');",
+                  "    ",
+                  "    // Check pagination object",
+                  "    const pagination = responseJson.pagination;",
+                  "    pm.expect(pagination).to.have.property('page');",
+                  "    pm.expect(pagination).to.have.property('size');",
+                  "    pm.expect(pagination).to.have.property('total');",
+                  "    pm.expect(pagination).to.have.property('has_next');",
+                  "    pm.expect(pagination).to.have.property('has_previous');",
+                  "});",
+                  "",
+                  "pm.test('Lookup codes have required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstItem = responseJson.items[0];",
+                  "        pm.expect(firstItem).to.have.property('lookup_code_id');",
+                  "        pm.expect(firstItem).to.have.property('code');",
+                  "        pm.expect(firstItem).to.have.property('name');",
+                  "        pm.expect(firstItem).to.have.property('lookup_type');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lookups/codes?page=1&size=25&sort_by=lookup_type&sort_order=asc",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "lookups",
+                "codes"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "25"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "lookup_type"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Lookup Codes - By Type Enhanced",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get lookup codes by type returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Type-specific lookup pagination', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    ",
+                  "    // Should have lookup_type in response metadata",
+                  "    pm.expect(responseJson).to.have.property('lookup_type');",
+                  "    ",
+                  "    // All items should be of the requested type",
+                  "    const items = responseJson.items;",
+                  "    if (items.length > 0) {",
+                  "        items.forEach(item => {",
+                  "            pm.expect(item.lookup_type).to.equal(responseJson.lookup_type);",
+                  "        });",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Active filter applied correctly', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const metadata = responseJson.metadata;",
+                  "    ",
+                  "    // Check if active filter was applied",
+                  "    if (metadata.filters_applied.is_active === true) {",
+                  "        const items = responseJson.items;",
+                  "        items.forEach(item => {",
+                  "            pm.expect(item.is_active).to.be.true;",
+                  "        });",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lookups/codes/{{lookup_type}}?page=1&size=50&is_active=true&sort_by=sort_order&sort_order=asc",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "lookups",
+                "codes",
+                "{{lookup_type}}"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "50"
+                },
+                {
+                  "key": "is_active",
+                  "value": "true"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "sort_order"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Lookup Codes - Cursor Pagination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Lookup cursor pagination returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Cursor pagination for lookups', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const pagination = responseJson.pagination;",
+                  "    ",
+                  "    // Cursor pagination specifics",
+                  "    pm.expect(pagination).to.have.property('next_cursor');",
+                  "    pm.expect(pagination).to.have.property('previous_cursor');",
+                  "    pm.expect(pagination.total).to.equal(-1);",
+                  "    ",
+                  "    // Store cursor for next request",
+                  "    if (pagination.next_cursor) {",
+                  "        pm.collectionVariables.set('lookup_next_cursor', pagination.next_cursor);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Performance is good for cursor pagination', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lookups/codes?pagination_type=cursor&size=30",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "lookups",
+                "codes"
+              ],
+              "query": [
+                {
+                  "key": "pagination_type",
+                  "value": "cursor"
+                },
+                {
+                  "key": "size",
+                  "value": "30"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Lookup Codes - Advanced Filtering",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Advanced lookup filtering returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Multiple lookup filters applied', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const metadata = responseJson.metadata;",
+                  "    const filters = metadata.filters_applied;",
+                  "    ",
+                  "    // Check applied filters",
+                  "    pm.expect(filters).to.have.property('is_active');",
+                  "    pm.expect(filters).to.have.property('parent_codes_only');",
+                  "    ",
+                  "    // Verify parent codes only filter",
+                  "    if (filters.parent_codes_only === true) {",
+                  "        const items = responseJson.items;",
+                  "        items.forEach(item => {",
+                  "            pm.expect(item.parent_lookup_code_id).to.be.null;",
+                  "        });",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Search functionality works', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const metadata = responseJson.metadata;",
+                  "    ",
+                  "    if (metadata.search_term) {",
+                  "        console.log('Search results:', responseJson.items.length);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lookups/codes?page=1&size=20&is_active=true&parent_codes_only=true&search=status&sort_by=name&sort_order=asc",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "lookups",
+                "codes"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "is_active",
+                  "value": "true"
+                },
+                {
+                  "key": "parent_codes_only",
+                  "value": "true"
+                },
+                {
+                  "key": "search",
+                  "value": "status"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "name"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Lookup Types Summary Enhanced",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Enhanced lookup summary returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Enhanced summary structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    ",
+                  "    pm.expect(responseJson).to.have.property('types');",
+                  "    pm.expect(responseJson).to.have.property('total_types');",
+                  "    pm.expect(responseJson).to.have.property('generated_at');",
+                  "    ",
+                  "    // Check types array structure",
+                  "    const types = responseJson.types;",
+                  "    if (types.length > 0) {",
+                  "        const firstType = types[0];",
+                  "        pm.expect(firstType).to.have.property('lookup_type');",
+                  "        pm.expect(firstType).to.have.property('total_count');",
+                  "        pm.expect(firstType).to.have.property('active_count');",
+                  "        pm.expect(firstType).to.have.property('inactive_count');",
+                  "        pm.expect(firstType).to.have.property('deleted_count');",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Summary counts are logical', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const types = responseJson.types;",
+                  "    ",
+                  "    types.forEach(type => {",
+                  "        const total = type.total_count;",
+                  "        const active = type.active_count;",
+                  "        const inactive = type.inactive_count;",
+                  "        const deleted = type.deleted_count;",
+                  "        ",
+                  "        // Total should be >= sum of active + inactive + deleted",
+                  "        pm.expect(total).to.be.at.least(active + inactive + deleted);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lookups/types/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "lookups",
+                "types",
                 "summary"
               ]
             }

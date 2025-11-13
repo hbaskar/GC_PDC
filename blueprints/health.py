@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 # Import dependencies
 from database.config import get_db, DatabaseConfig, get_engine
-from schemas.pdc_schemas import ErrorResponse
+from schemas.classification_schemas import ErrorResponse
 
 # Create blueprint
 bp = func.Blueprint()
