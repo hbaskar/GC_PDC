@@ -19,6 +19,7 @@ class PDCClassification(Base):
     description = Column(String(250))
     old_classification_id = Column(String(50))
     retention_policy_id = Column(Integer, ForeignKey("pdc_retention_policies.retention_policy_id"), nullable=False)
+    
     condition_event = Column(String(100))
     condition_offset_days = Column(Integer)
     condition_type = Column(String(50))
@@ -61,18 +62,82 @@ class PDCClassification(Base):
         return f"<PDCClassification(id={self.classification_id}, name='{self.name}', code='{self.code}')>"
     
     def to_dict(self):
-        """Convert model instance to dictionary."""
-        return {
+        """Convert model instance to dictionary with all database columns."""
+        base_dict = {
+            # Primary identifiers
             'classification_id': self.classification_id,
+            'classification_code': self.code,  # API-friendly field name
             'name': self.name,
-            'code': self.code,
             'description': self.description,
-            'classification_level': self.classification_level,
-            'media_type': self.media_type,
+            'old_classification_id': self.old_classification_id,
+            
+            # Retention and policy fields
+            'retention_policy_id': self.retention_policy_id,
+            'condition_event': self.condition_event,
+            'condition_offset_days': self.condition_offset_days,
+            'condition_type': self.condition_type,
+            'destruction_method': self.destruction_method,
+            'condition': self.condition,
+            'vital': self.vital,
+            'citation': self.citation,
+            'see': self.see,
+            
+            # Classification attributes
             'file_type': self.file_type,
+            'series': self.series,
+            'classification_level': self.classification_level,
+            'sensitivity_rating': self.sensitivity_rating,
+            'media_type': self.media_type,
+            'template_id': self.template_id,
+            'classification_purpose': self.classification_purpose,
+            'requires_tax_clearance': self.requires_tax_clearance,
+            'label_format': self.label_format,
+            'secure': self.secure,
+            'effective_date': self.effective_date.isoformat() if self.effective_date else None,
+            
+            # Organizational fields
+            'organization_id': self.organization_id,
+            'record_owner_id': self.record_owner_id,
+            'record_owner': self.record_owner,
+            
+            # Status and lifecycle fields
             'is_active': self.is_active,
+            'status': 'active' if self.is_active else 'inactive',  # API-friendly status
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'created_by': self.created_by,
             'modified_at': self.modified_at.isoformat() if self.modified_at else None,
-            'modified_by': self.modified_by
+            'modified_by': self.modified_by,
+            'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
+            'deleted_by': self.deleted_by,
+            'is_deleted': self.is_deleted,
+            'last_accessed_at': self.last_accessed_at.isoformat() if self.last_accessed_at else None,
+            'last_accessed_by': self.last_accessed_by,
         }
+        
+        # Add retention policy fields through relationship
+        if self.retention_policy:
+            retention_dict = {
+                'retention_code': self.retention_policy.retention_code,
+                'retention_type': self.retention_policy.retention_type,
+                'trigger_event': self.retention_policy.trigger_event,
+                'min_retention_years': self.retention_policy.retention_period_days // 365 if self.retention_policy.retention_period_days else None,
+                'max_retention_years': (self.retention_policy.retention_period_days // 365) + 2 if self.retention_policy.retention_period_days else None,  # Estimate max as min + 2
+                'legal_hold_flag': False,  # Default value, could be enhanced later
+                'destruction_method': self.retention_policy.destruction_method,
+                'review_frequency': self.retention_policy.review_frequency
+            }
+            base_dict.update(retention_dict)
+        else:
+            # Provide default values if no retention policy is linked
+            base_dict.update({
+                'retention_code': None,
+                'retention_type': None,
+                'trigger_event': None,
+                'min_retention_years': None,
+                'max_retention_years': None,
+                'legal_hold_flag': False,
+                'destruction_method': None,
+                'review_frequency': None
+            })
+        
+        return base_dict

@@ -1,0 +1,18 @@
+'id': self.classification_id,  # Updated to match API response format
+            'classification_code': self.code,  # Updated to match API request format
+            'description': self.description,
+            'status': 'active' if self.is_active else 'inactive',  # Updated to match API format
+            'category': self.classification_level,  # Map classification_level to category
+            'sub_category': self.media_type,  # Map media_type to sub_category
+            'keywords': self.file_type,  # Map file_type to keywords
+            'series': self.series,  # Map series to series
+            'doc_types': self.,  # Map series to doc_types
+            'classification_level': self.classification_level,
+            'media_type': self.media_type,
+            'file_type': self.file_type,
+            'retention_policy_id': self.retention_policy_id,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'created_by': self.created_by,
+            'modified_at': self.modified_at.isoformat() if self.modified_at else None,
+            'modified_by':

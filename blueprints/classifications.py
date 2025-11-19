@@ -1,11 +1,13 @@
 """
 Classification API Blueprint
-Contains all classification-related endpoints.
+Contains all classification-related endpoints with performance optimizations.
 """
 import azure.functions as func
 import logging
 import math
+import time
 from typing import Optional
+from functools import wraps
 from pydantic import ValidationError
 
 # Import dependencies
@@ -24,6 +26,24 @@ import json
 # Create blueprint
 bp = func.Blueprint()
 
+def monitor_performance(endpoint_name: str):
+    """Decorator to monitor endpoint performance."""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            try:
+                result = func(*args, **kwargs)
+                execution_time = (time.time() - start_time) * 1000
+                logging.info(f"Performance: {endpoint_name} completed in {execution_time:.2f}ms")
+                return result
+            except Exception as e:
+                execution_time = (time.time() - start_time) * 1000
+                logging.error(f"Performance: {endpoint_name} failed after {execution_time:.2f}ms - {str(e)}")
+                raise
+        return wrapper
+    return decorator
+
 def create_error_response(message: str, status_code: int, detail: str = None) -> func.HttpResponse:
     """Create standardized error response."""
     error_response = ErrorResponse(
@@ -37,24 +57,51 @@ def create_error_response(message: str, status_code: int, detail: str = None) ->
         mimetype="application/json"
     )
 
-def create_success_response(data: dict, status_code: int = 200) -> func.HttpResponse:
-    """Create standardized success response."""
+def create_success_response(data: dict, status_code: int = 200, compress: bool = False) -> func.HttpResponse:
+    """Create standardized success response with optional compression."""
     import json
+    import gzip
+    
+    response_body = json.dumps(data, default=str)
+    
+    # Enable compression for large responses (>1KB) if requested
+    if compress and len(response_body) > 1024:
+        try:
+            compressed_body = gzip.compress(response_body.encode('utf-8'))
+            # Only use compression if it actually reduces size significantly
+            if len(compressed_body) < len(response_body) * 0.8:
+                return func.HttpResponse(
+                    compressed_body,
+                    status_code=status_code,
+                    headers={
+                        'Content-Type': 'application/json',
+                        'Content-Encoding': 'gzip'
+                    }
+                )
+        except Exception as e:
+            logging.warning(f"Compression failed, returning uncompressed: {str(e)}")
+    
     return func.HttpResponse(
-        json.dumps(data, default=str),
+        response_body,
         status_code=status_code,
         mimetype="application/json"
     )
 
 @bp.route(route="classifications", methods=["GET"])
+@monitor_performance("get_all_classifications")
 def get_all_classifications(req: func.HttpRequest) -> func.HttpResponse:
-    """Get all PDC classifications with advanced pagination."""
+    """Get all PDC classifications with advanced pagination and performance optimizations."""
     try:
         db = next(get_db())
         service = PDCClassificationService(db)
         
         # Parse query parameters
         request_params = dict(req.params)
+        
+        # Performance optimization flags
+        minimal = request_params.get('minimal', 'false').lower() in ('true', '1', 'yes')
+        fields = request_params.get('fields', '').split(',') if request_params.get('fields') else None
+        compress_response = request_params.get('compress', 'true').lower() in ('true', '1', 'yes')
         
         # Parse pagination parameters
         pagination = PaginationQueryParser.parse_pagination_params(request_params)
@@ -66,19 +113,17 @@ def get_all_classifications(req: func.HttpRequest) -> func.HttpResponse:
         search = request_params.get('search', '').strip() or None
         include_deleted = request_params.get('include_deleted', 'false').lower() in ('true', '1', 'yes')
         
-        # Get paginated results
-        result = service.get_all_paginated(
+        # Get paginated results with performance optimizations
+        result = service.get_all_paginated_optimized(
             pagination=pagination,
             filters=filters,
             search=search,
-            include_deleted=include_deleted
+            include_deleted=include_deleted,
+            minimal=minimal,
+            fields=fields
         )
         
-        return func.HttpResponse(
-            json.dumps(result, default=str),
-            status_code=200,
-            mimetype="application/json"
-        )
+        return create_success_response(result, compress=compress_response)
     except Exception as e:
         logging.error(f"Error getting classifications: {str(e)}")
         return func.HttpResponse(
@@ -88,6 +133,7 @@ def get_all_classifications(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 @bp.route(route="classifications/summary", methods=["GET"])
+@monitor_performance("get_classifications_summary")
 def get_classifications_summary(req: func.HttpRequest) -> func.HttpResponse:
     """Get summary statistics for PDC classifications."""
     try:
@@ -113,53 +159,123 @@ def get_classifications_summary(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500,
             mimetype="application/json"
         )
-def get_classifications(req: func.HttpRequest) -> func.HttpResponse:
-    """Get all classifications with optional filtering and pagination."""
+
+@bp.route(route="classifications/performance-test", methods=["GET"])
+@monitor_performance("classification_performance_test")
+def test_classification_performance(req: func.HttpRequest) -> func.HttpResponse:
+    """Test endpoint to demonstrate performance improvements with and without retention JOIN."""
     try:
-        # Parse query parameters
-        page = int(req.params.get('page', 1))
-        size = int(req.params.get('size', 10))
-        search = req.params.get('search', '')
-        active_only = req.params.get('active_only', 'true').lower() == 'true'
+        import time
         
-        # Validate pagination parameters
-        if page < 1 or size < 1 or size > 100:
-            return create_error_response("Invalid pagination parameters", 400)
-        
-        # Get database connection and service
         db = next(get_db())
         service = PDCClassificationService(db)
         
-        # Get classifications with filtering
-        classifications, total = service.get_all(
-            skip=(page - 1) * size,
-            limit=size,
-            search=search,
-            is_active=active_only
-        )
+        # Parse query parameters
+        request_params = dict(req.params)
+        test_type = request_params.get('type', 'comparison')  # 'comparison', 'minimal', 'search'
         
-        # Convert to response format
-        items = [
-            PDCClassificationResponse.model_validate(classification).model_dump()
-            for classification in classifications
-        ]
+        results = {}
         
-        # Calculate pagination metadata
-        pages = math.ceil(total / size) if size > 0 else 0
+        if test_type == 'comparison':
+            # Test 1: With retention JOIN (old way)
+            start_time = time.time()
+            query_with_join = service._build_base_query(include_retention=True, include_template=False)
+            items_with_join = query_with_join.limit(20).all()
+            time_with_join = (time.time() - start_time) * 1000
+            
+            # Test 2: Without retention JOIN (optimized way)  
+            start_time = time.time()
+            query_without_join = service._build_base_query(include_retention=False, include_template=False)
+            items_without_join = query_without_join.limit(20).all()
+            time_without_join = (time.time() - start_time) * 1000
+            
+            results = {
+                "test_type": "JOIN comparison",
+                "with_retention_join": {
+                    "query_time_ms": round(time_with_join, 2),
+                    "items_count": len(items_with_join)
+                },
+                "without_retention_join": {
+                    "query_time_ms": round(time_without_join, 2),
+                    "items_count": len(items_without_join)
+                },
+                "performance_improvement": {
+                    "time_saved_ms": round(time_with_join - time_without_join, 2),
+                    "percentage_faster": round(((time_with_join - time_without_join) / time_with_join * 100), 1) if time_with_join > 0 else 0
+                },
+                "explanation": "Shows performance difference between queries with and without retention policy JOIN"
+            }
+            
+        elif test_type == 'search':
+            # Test search performance
+            search_term = request_params.get('search', 'document')
+            
+            # Smart search (optimized)
+            start_time = time.time()
+            query_smart = service._build_base_query(search=search_term, include_retention=None)  # Auto-detect
+            items_smart = query_smart.limit(10).all()
+            time_smart = (time.time() - start_time) * 1000
+            
+            # Always JOIN search (old way)
+            start_time = time.time()
+            query_always_join = service._build_base_query(search=search_term, include_retention=True)
+            items_always_join = query_always_join.limit(10).all()
+            time_always_join = (time.time() - start_time) * 1000
+            
+            results = {
+                "test_type": "search performance comparison",
+                "search_term": search_term,
+                "smart_search": {
+                    "query_time_ms": round(time_smart, 2),
+                    "items_found": len(items_smart),
+                    "description": "Only JOINs retention if search term suggests retention data needed"
+                },
+                "always_join_search": {
+                    "query_time_ms": round(time_always_join, 2), 
+                    "items_found": len(items_always_join),
+                    "description": "Always JOINs retention policy (old behavior)"
+                },
+                "performance_improvement": {
+                    "time_saved_ms": round(time_always_join - time_smart, 2),
+                    "percentage_faster": round(((time_always_join - time_smart) / time_always_join * 100), 1) if time_always_join > 0 else 0
+                }
+            }
         
-        response_data = {
-            "items": items,
-            "total": total,
-            "page": page,
-            "size": size,
-            "pages": pages
-        }
+        else:  # minimal test
+            # Test minimal vs full response
+            pagination = PaginationQueryParser.parse_pagination_params({'page': '1', 'size': '10'})
+            
+            start_time = time.time()
+            full_result = service.get_all_paginated_optimized(pagination, minimal=False)
+            full_time = (time.time() - start_time) * 1000
+            
+            start_time = time.time()
+            minimal_result = service.get_all_paginated_optimized(pagination, minimal=True)
+            minimal_time = (time.time() - start_time) * 1000
+            
+            results = {
+                "test_type": "minimal vs full response",
+                "full_response": {
+                    "query_time_ms": round(full_time, 2),
+                    "response_size_chars": len(str(full_result)),
+                    "includes_all_fields": True
+                },
+                "minimal_response": {
+                    "query_time_ms": round(minimal_time, 2),
+                    "response_size_chars": len(str(minimal_result)),
+                    "includes_essential_fields_only": True
+                },
+                "performance_improvement": {
+                    "time_saved_ms": round(full_time - minimal_time, 2),
+                    "size_reduction_percentage": round((1 - len(str(minimal_result)) / len(str(full_result))) * 100, 1) if len(str(full_result)) > 0 else 0
+                }
+            }
         
-        return create_success_response(response_data)
+        return create_success_response(results)
         
     except Exception as e:
-        logging.error(f"Get classifications failed: {str(e)}")
-        return create_error_response("Failed to retrieve classifications", 500, str(e))
+        logging.error(f"Performance test failed: {str(e)}")
+        return create_error_response("Performance test failed", 500, str(e))
 
 @bp.route(route="classifications/{classification_id:int}", methods=["GET"])
 def get_classification(req: func.HttpRequest) -> func.HttpResponse:
@@ -176,9 +292,8 @@ def get_classification(req: func.HttpRequest) -> func.HttpResponse:
         if not classification:
             return create_error_response("Classification not found", 404)
         
-        # Enrich with template data and serialize
-        enriched_data = service._enrich_classification_with_template(classification)
-        response_data = PDCClassificationResponse.model_validate(enriched_data).model_dump()
+        # Convert to API dict format using model's to_dict method
+        response_data = service.to_api_dict(classification)
         return create_success_response(response_data)
         
     except ValueError:
@@ -213,7 +328,8 @@ def create_classification(req: func.HttpRequest) -> func.HttpResponse:
         # Create classification
         new_classification = service.create(classification_data)
         
-        response_data = PDCClassificationResponse.model_validate(new_classification).model_dump()
+        # Convert to API dict format using model's to_dict method
+        response_data = service.to_api_dict(new_classification)
         return create_success_response(response_data, 201)
         
     except Exception as e:
@@ -250,7 +366,8 @@ def update_classification(req: func.HttpRequest) -> func.HttpResponse:
         if not updated_classification:
             return create_error_response("Classification not found", 404)
         
-        response_data = PDCClassificationResponse.model_validate(updated_classification).model_dump()
+        # Convert to API dict format using model's to_dict method
+        response_data = service.to_api_dict(updated_classification)
         return create_success_response(response_data)
         
     except ValueError:
@@ -277,8 +394,8 @@ def delete_classification(req: func.HttpRequest) -> func.HttpResponse:
         if not deleted_classification:
             return create_error_response("Classification not found or already deleted", 404)
         
-        # Return the deleted classification
-        response_data = PDCClassificationResponse.model_validate(deleted_classification).model_dump()
+        # Convert to API dict format using model's to_dict method
+        response_data = service.to_api_dict(deleted_classification)
         return create_success_response(response_data)
         
     except ValueError:
@@ -305,7 +422,8 @@ def restore_classification(req: func.HttpRequest) -> func.HttpResponse:
         if not restored_classification:
             return create_error_response("Classification not found or not deleted", 404)
         
-        response_data = PDCClassificationResponse.model_validate(restored_classification).model_dump()
+        # Convert to API dict format using model's to_dict method
+        response_data = service.to_api_dict(restored_classification)
         return create_success_response(response_data)
         
     except ValueError:

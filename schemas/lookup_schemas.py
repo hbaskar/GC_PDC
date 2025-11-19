@@ -33,7 +33,7 @@ class PDCLookupTypeResponse(PDCLookupTypeBase):
     modified_at: Optional[datetime] = None
     modified_by: Optional[str] = None
     
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "extra": "allow"}
 
 # ========== LOOKUP CODE SCHEMAS ==========
 
@@ -65,7 +65,7 @@ class PDCLookupCodeResponse(PDCLookupCodeBase):
     modified_at: Optional[datetime] = None
     modified_by: Optional[str] = None
     
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "extra": "allow"}
 
 # ========== COMBINED RESPONSE SCHEMAS ==========
 

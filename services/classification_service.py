@@ -4,6 +4,7 @@ Unified PDC Classification Service
 This module provides a comprehensive service for PDC Classification operations,
 including basic CRUD operations, advanced pagination, filtering, and search capabilities.
 """
+import logging
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -15,7 +16,8 @@ from services.pagination import (
     AdvancedPagination, 
     PaginationRequest, 
     PaginationResponse, 
-    SortOrder
+    SortOrder,
+    PaginationType
 )
 
 class PDCClassificationService:
@@ -30,23 +32,20 @@ class PDCClassificationService:
         self.db = db
     
     # ========================================
-    # TEMPLATE ENRICHMENT
+    # MODEL TO DICT CONVERSION
     # ========================================
     
-    def _enrich_classification_with_template(self, classification: PDCClassification) -> Dict[str, Any]:
-        """Enrich classification data with template information."""
-        # Convert to dict
-        data = classification.__dict__.copy()
-        
-        # Remove SQLAlchemy internal state
-        data.pop('_sa_instance_state', None)
+    def to_api_dict(self, classification: PDCClassification) -> Dict[str, Any]:
+        """Convert classification model to API dictionary format using model's to_dict()."""
+        # Use the model's to_dict method which handles all field mapping
+        data = classification.to_dict()
         
         # Add template name if template exists
         if hasattr(classification, 'template') and classification.template:
             data['template_name'] = classification.template.template_name
         else:
             data['template_name'] = None
-            
+                
         return data
     
     # ========================================
@@ -58,15 +57,61 @@ class PDCClassificationService:
         filters: Optional[Dict[str, Any]] = None,
         search: Optional[str] = None,
         include_deleted: bool = False,
-        include_template: bool = True
+        include_template: bool = True,
+        include_retention: bool = None
     ):
-        """Build the base query with optional joins and filters."""
-        if include_template:
-            query = self.db.query(PDCClassification).outerjoin(
+        """Build the base query with smart conditional joins based on actual data needs."""
+        from models.pdc_retention_policy import PDCRetentionPolicy
+        
+        # Start with base query
+        query = self.db.query(PDCClassification)
+        
+        # Smart join logic: only join retention policy when ACTUALLY needed
+        needs_retention_join = False
+        
+        if include_retention is True:
+            # Explicitly requested
+            needs_retention_join = True
+        elif include_retention is None:
+            # Auto-detect: only join if we're actually filtering or searching retention fields
+            if filters:
+                retention_filters = [
+                    'retention_policy_id', 'retention_code', 'retention_type', 
+                    'jurisdiction', 'trigger_event', 'min_retention_years', 'max_retention_years'
+                ]
+                needs_retention_join = any(k in retention_filters for k in filters.keys())
+            
+            # For search: only join if search is specifically for retention data
+            # Most searches are for classification name/code, not retention fields
+            if search and search.strip() and not needs_retention_join:
+                # Only join for retention search if search looks like retention data
+                search_lower = search.lower().strip()
+                retention_keywords = ['retention', 'legal', 'jurisdiction', 'trigger', 'policy']
+                needs_retention_join = any(keyword in search_lower for keyword in retention_keywords)
+        
+        if needs_retention_join:
+            query = query.join(
+                PDCRetentionPolicy, PDCClassification.retention_policy_id == PDCRetentionPolicy.retention_policy_id
+            )
+            logging.debug("Performance: Added retention policy JOIN (needed for filters/search)")
+        else:
+            logging.debug("Performance: Skipped retention policy JOIN (not needed)")
+        
+        # Only join template if explicitly needed
+        needs_template_join = (
+            include_template and (
+                (filters and 'template_id' in filters) or
+                include_template is True  # Explicitly requested for response data
+            )
+        )
+        
+        if needs_template_join:
+            query = query.outerjoin(
                 PDCTemplate, PDCClassification.template_id == PDCTemplate.template_id
             )
+            logging.debug("Performance: Added template JOIN")
         else:
-            query = self.db.query(PDCClassification)
+            logging.debug("Performance: Skipped template JOIN")
         
         # Apply deletion filter
         if not include_deleted:
@@ -76,9 +121,9 @@ class PDCClassificationService:
         if filters:
             query = self._apply_filters(query, filters)
         
-        # Apply search
+        # Apply search with smart retention field inclusion
         if search and search.strip():
-            query = self._apply_search(query, search.strip())
+            query = self._apply_search(query, search.strip(), include_retention_search=needs_retention_join)
         
         return query
     
@@ -109,6 +154,33 @@ class PDCClassificationService:
         if 'template_id' in filters and filters['template_id']:
             query = query.filter(PDCClassification.template_id == filters['template_id'])
         
+        # Retention Policy filters
+        from models.pdc_retention_policy import PDCRetentionPolicy
+        
+        if 'retention_policy_id' in filters and filters['retention_policy_id']:
+            query = query.filter(PDCClassification.retention_policy_id == filters['retention_policy_id'])
+            
+        if 'retention_code' in filters and filters['retention_code']:
+            query = query.filter(PDCRetentionPolicy.retention_code == filters['retention_code'])
+            
+        if 'retention_type' in filters and filters['retention_type']:
+            query = query.filter(PDCRetentionPolicy.retention_type == filters['retention_type'])
+            
+        if 'jurisdiction' in filters and filters['jurisdiction']:
+            query = query.filter(PDCRetentionPolicy.jurisdiction == filters['jurisdiction'])
+            
+        if 'trigger_event' in filters and filters['trigger_event']:
+            query = query.filter(PDCRetentionPolicy.trigger_event == filters['trigger_event'])
+        
+        # Retention period range filters (convert years to days)
+        if 'min_retention_years' in filters and filters['min_retention_years'] is not None:
+            min_days = filters['min_retention_years'] * 365
+            query = query.filter(PDCRetentionPolicy.retention_period_days >= min_days)
+            
+        if 'max_retention_years' in filters and filters['max_retention_years'] is not None:
+            max_days = filters['max_retention_years'] * 365
+            query = query.filter(PDCRetentionPolicy.retention_period_days <= max_days)
+        
         # Sensitivity rating filters
         if 'sensitivity_min' in filters and filters['sensitivity_min'] is not None:
             query = query.filter(PDCClassification.sensitivity_rating >= filters['sensitivity_min'])
@@ -125,11 +197,14 @@ class PDCClassificationService:
         
         return query
     
-    def _apply_search(self, query, search: str):
-        """Apply full-text search across multiple fields."""
+    def _apply_search(self, query, search: str, include_retention_search: bool = True):
+        """Apply smart full-text search across classification fields and optionally retention fields."""
+        from models.pdc_retention_policy import PDCRetentionPolicy
+        
         search_term = f"%{search}%"
         
-        search_filter = or_(
+        # Always search core classification fields (these are fast - no JOIN needed)
+        classification_search = or_(
             PDCClassification.name.ilike(search_term),
             PDCClassification.description.ilike(search_term),
             PDCClassification.code.ilike(search_term),
@@ -140,7 +215,62 @@ class PDCClassificationService:
             PDCClassification.file_type.ilike(search_term)
         )
         
+        # Only include retention policy search if retention JOIN is already happening
+        if include_retention_search:
+            retention_search = or_(
+                PDCRetentionPolicy.retention_code.ilike(search_term),
+                PDCRetentionPolicy.retention_type.ilike(search_term),
+                PDCRetentionPolicy.jurisdiction.ilike(search_term),
+                PDCRetentionPolicy.legal_basis.like(search_term),
+                PDCRetentionPolicy.applicable_data_types.like(search_term)
+            )
+            
+            search_filter = or_(classification_search, retention_search)
+        else:
+            search_filter = classification_search
+        
         return query.filter(search_filter)
+    
+    def _create_minimal_response_dict(self, classification: PDCClassification) -> Dict[str, Any]:
+        """Create minimal response dictionary for performance."""
+        return {
+            'classification_id': classification.classification_id,
+            'classification_code': classification.code,
+            'name': classification.name,
+            'is_active': classification.is_active,
+            'classification_level': classification.classification_level,
+            'organization_id': classification.organization_id
+        }
+    
+    def _filter_response_fields(self, data: Dict[str, Any], fields: List[str]) -> Dict[str, Any]:
+        """Filter response to include only requested fields."""
+        if not fields:
+            return data
+        
+        filtered = {}
+        for field in fields:
+            field = field.strip()
+            if field in data:
+                filtered[field] = data[field]
+        
+        return filtered
+    
+    def _needs_retention_data_for_response(self, minimal: bool, fields: Optional[List[str]]) -> bool:
+        """Check if retention policy data is needed for the response."""
+        if minimal:
+            return False  # Minimal responses don't include retention data
+            
+        if fields:
+            # Check if any requested fields are retention-related
+            retention_response_fields = [
+                'retention_policy_id', 'retention_code', 'retention_type', 
+                'jurisdiction', 'legal_basis', 'trigger_event', 'retention_period_days'
+            ]
+            return any(field.strip() in retention_response_fields for field in fields)
+        
+        # For full responses, we don't actually need retention JOIN for basic classification data
+        # The classification.retention_policy_id is already available without JOIN
+        return False
     
     # ========================================
     # BASIC CRUD OPERATIONS
@@ -148,7 +278,32 @@ class PDCClassificationService:
     
     def create(self, classification_data: PDCClassificationCreate) -> PDCClassification:
         """Create a new PDC Classification."""
-        db_classification = PDCClassification(**classification_data.dict())
+        # Map API fields to database model fields
+        create_dict = classification_data.dict(exclude_unset=True)
+        
+        # Map API field names to database field names
+        file_type_value = create_dict.get('file_type')
+        if file_type_value and len(file_type_value) > 20:
+            file_type_value = file_type_value[:20]  # Truncate to 20 chars max
+            
+        db_data = {
+            'code': create_dict.get('classification_code'),
+            'name': create_dict.get('name') or create_dict.get('classification_code'),  # Use name if provided, otherwise code
+            'description': create_dict.get('description'),
+            'is_active': create_dict.get('is_active', True),  # Default to True
+            'classification_level': create_dict.get('classification_level'),
+            'media_type': create_dict.get('media_type'),
+            'file_type': file_type_value,
+            'series': create_dict.get('series'),
+            'retention_policy_id': create_dict.get('retention_policy_id'),
+            'organization_id': create_dict.get('organization_id', 1),  # Use provided or default to 1
+            'created_by': 'api_user',  # Default user
+        }
+        
+        # Remove None values
+        db_data = {k: v for k, v in db_data.items() if v is not None}
+        
+        db_classification = PDCClassification(**db_data)
         self.db.add(db_classification)
         self.db.commit()
         self.db.refresh(db_classification)
@@ -170,14 +325,33 @@ class PDCClassificationService:
         if not db_classification:
             return None
         
-        # Update only provided fields
-        update_data = classification_data.dict(exclude_unset=True)
+        # Update only provided fields with field mapping
+        update_dict = classification_data.dict(exclude_unset=True)
+        
+        # Direct field mapping (most fields match between API and DB)
+        field_mapping = {
+            'classification_code': 'code',
+            'name': 'name',
+            'description': 'description',
+            'is_active': 'is_active',
+            'classification_level': 'classification_level',
+            'media_type': 'media_type',
+            'file_type': 'file_type',
+            'series': 'series',
+            'retention_policy_id': 'retention_policy_id',
+            'organization_id': 'organization_id',
+        }
         
         # Set modified timestamp
-        update_data['modified_at'] = datetime.utcnow()
+        db_classification.modified_at = datetime.utcnow()
+        db_classification.modified_by = 'api_user'  # Default user
         
-        for field, value in update_data.items():
-            setattr(db_classification, field, value)
+        for api_field, value in update_dict.items():
+            if api_field in field_mapping:
+                db_field = field_mapping[api_field]
+                if api_field == 'file_type' and value and len(value) > 20:
+                    value = value[:20]  # Truncate file_type to 20 chars max
+                setattr(db_classification, db_field, value)
         
         self.db.commit()
         self.db.refresh(db_classification)
@@ -231,6 +405,82 @@ class PDCClassificationService:
     # ADVANCED PAGINATION AND LISTING
     # ========================================
     
+    def get_all_paginated_optimized(
+        self,
+        pagination: PaginationRequest,
+        filters: Optional[Dict[str, Any]] = None,
+        search: Optional[str] = None,
+        include_deleted: bool = False,
+        minimal: bool = False,
+        fields: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Optimized version of get_all_paginated with performance enhancements.
+        
+        Args:
+            pagination: Pagination parameters
+            filters: Dictionary of filters to apply
+            search: Search term for full-text search
+            include_deleted: Whether to include deleted records
+            minimal: Return minimal response for better performance
+            fields: Specific fields to include in response
+            
+        Returns:
+            Paginated response with performance optimizations
+        """
+        import time
+        start_time = time.time()
+        
+        # Smart join detection - avoid unnecessary joins
+        include_template = not minimal and (not fields or any(f.startswith('template') for f in fields))
+        
+        # Only include retention JOIN if actually needed for filtering, searching, or response
+        needs_retention = (
+            self._needs_retention_data_for_response(minimal, fields) or
+            (filters and any(k in ['retention_policy_id', 'retention_code', 'retention_type', 
+                                 'jurisdiction', 'trigger_event', 'min_retention_years', 'max_retention_years'] 
+                           for k in filters.keys())) if filters else False
+        )
+        
+        # Build optimized query
+        query = self._build_base_query(
+            filters=filters, 
+            search=search, 
+            include_deleted=include_deleted,
+            include_template=include_template,
+            include_retention=needs_retention
+        )
+        
+        # Use smart pagination strategy
+        if pagination.page > 5 or pagination.size > 50:
+            # Use cursor pagination for large datasets/later pages
+            pagination.pagination_type = PaginationType.CURSOR
+            result = self._cursor_paginated_response_optimized(query, pagination, minimal, fields)
+        else:
+            # Use offset pagination for small datasets/early pages
+            count_query = self._build_base_query(
+                filters=filters, 
+                search=search, 
+                include_deleted=include_deleted,
+                include_template=False,  # Don't join template for count
+                include_retention=needs_retention
+            )
+            result = self._offset_paginated_response_optimized(query, count_query, pagination, filters or {}, search or "", minimal, fields)
+        
+        # Add performance metrics
+        execution_time = (time.time() - start_time) * 1000
+        result["performance"] = {
+            "query_time_ms": round(execution_time, 2),
+            "optimizations_applied": {
+                "minimal_response": minimal,
+                "field_filtering": bool(fields),
+                "smart_joins": True,
+                "pagination_strategy": pagination.pagination_type.value
+            }
+        }
+        
+        return result
+
     def get_all_paginated(
         self,
         pagination: PaginationRequest,
@@ -304,6 +554,123 @@ class PDCClassificationService:
         
         return classifications, total
     
+    def _offset_paginated_response_optimized(
+        self, 
+        query, 
+        count_query, 
+        pagination: PaginationRequest,
+        filters: Dict[str, Any],
+        search: str,
+        minimal: bool = False,
+        fields: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Optimized offset-based pagination with minimal responses."""
+        
+        # Apply pagination
+        items, pagination_response = AdvancedPagination.offset_pagination(
+            query=query,
+            model_class=PDCClassification,
+            pagination=pagination,
+            count_query=count_query
+        )
+        
+        # Convert items to API dict format with optimizations
+        serialized_items = []
+        for item in items:
+            if minimal:
+                api_data = self._create_minimal_response_dict(item)
+            else:
+                api_data = self.to_api_dict(item)
+                
+            # Apply field filtering if specified
+            if fields:
+                api_data = self._filter_response_fields(api_data, fields)
+                
+            serialized_items.append(api_data)
+        
+        return {
+            "items": serialized_items,
+            "pagination": pagination_response.model_dump(),
+            "filters_applied": filters,
+            "sort_info": {
+                "sort_by": pagination.sort_by,
+                "sort_order": pagination.sort_order.value
+            },
+            "search_applied": search,
+            "response_optimizations": {
+                "minimal": minimal,
+                "fields_filtered": bool(fields),
+                "item_count": len(serialized_items)
+            }
+        }
+
+    def _cursor_paginated_response_optimized(
+        self, 
+        query, 
+        pagination: PaginationRequest,
+        minimal: bool = False,
+        fields: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Optimized cursor-based pagination with minimal responses."""
+        
+        # Determine cursor field and value
+        cursor_field = getattr(PDCClassification, pagination.sort_by, PDCClassification.classification_id)
+        cursor_value = None
+        
+        if pagination.cursor:
+            try:
+                cursor_value = int(pagination.cursor)
+            except ValueError:
+                cursor_value = None
+        
+        # Apply cursor pagination
+        items, next_cursor, previous_cursor = AdvancedPagination.cursor_pagination(
+            query=query,
+            model_class=PDCClassification,
+            cursor_field=cursor_field,
+            cursor_value=cursor_value,
+            limit=pagination.size,
+            sort_order=SortOrder.DESC  # Newest first for cursor pagination
+        )
+        
+        # Create pagination response
+        pagination_response = PaginationResponse.from_cursor_pagination(
+            page=pagination.page,
+            size=pagination.size,
+            total=-1,  # Not calculated for cursor pagination (performance)
+            next_cursor=next_cursor,
+            previous_cursor=previous_cursor
+        )
+        
+        # Convert items to API dict format with optimizations
+        serialized_items = []
+        for item in items:
+            if minimal:
+                api_data = self._create_minimal_response_dict(item)
+            else:
+                api_data = self.to_api_dict(item)
+                
+            # Apply field filtering if specified
+            if fields:
+                api_data = self._filter_response_fields(api_data, fields)
+                
+            serialized_items.append(api_data)
+        
+        return {
+            "items": serialized_items,
+            "pagination": pagination_response.model_dump(),
+            "sort_info": {
+                "sort_by": cursor_field.name if hasattr(cursor_field, 'name') else 'classification_id',
+                "sort_order": "desc",
+                "pagination_type": "cursor"
+            },
+            "response_optimizations": {
+                "minimal": minimal,
+                "fields_filtered": bool(fields),
+                "item_count": len(serialized_items)
+            }
+        }
+    
     def _offset_paginated_response(
         self, 
         query, 
@@ -322,11 +689,11 @@ class PDCClassificationService:
             count_query=count_query
         )
         
-        # Enrich items with template data and serialize
+        # Convert items to API dict format using model's to_dict method
         serialized_items = []
         for item in items:
-            enriched_data = self._enrich_classification_with_template(item)
-            serialized_items.append(PDCClassificationResponse.model_validate(enriched_data).model_dump())
+            api_data = self.to_api_dict(item)
+            serialized_items.append(api_data)
         
         # Create custom response with enriched data
         return {
@@ -376,11 +743,11 @@ class PDCClassificationService:
             previous_cursor=previous_cursor
         )
         
-        # Enrich items with template data and serialize
+        # Convert items to API dict format using model's to_dict method
         serialized_items = []
         for item in items:
-            enriched_data = self._enrich_classification_with_template(item)
-            serialized_items.append(PDCClassificationResponse.model_validate(enriched_data).model_dump())
+            api_data = self.to_api_dict(item)
+            serialized_items.append(api_data)
         
         # Create custom response with enriched data
         return {
@@ -524,12 +891,16 @@ class PaginationQueryParser:
     @staticmethod
     def parse_pagination_params(request_params: Dict[str, str]) -> PaginationRequest:
         """Parse pagination parameters from request."""
+        # Determine pagination type based on use_cursor parameter
+        use_cursor = request_params.get('use_cursor', 'false').lower() == 'true'
+        pagination_type = PaginationType.CURSOR if use_cursor else PaginationType.OFFSET
+        
         return PaginationRequest(
             page=int(request_params.get('page', 1)),
             size=int(request_params.get('size', 20)),
             sort_by=request_params.get('sort_by', 'classification_id'),
             sort_order=SortOrder(request_params.get('sort_order', 'asc')),
-            use_cursor=request_params.get('use_cursor', 'false').lower() == 'true',
+            pagination_type=pagination_type,
             cursor=request_params.get('cursor')
         )
     

@@ -14,14 +14,14 @@ from schemas.lookup_schemas import (
     PDCLookupTypeCreate, 
     PDCLookupTypeUpdate,
     PDCLookupCodeCreate,
-    PDCLookupCodeUpdate,
-    PDCLookupCodeResponse
+    PDCLookupCodeUpdate
 )
 from services.pagination import (
     AdvancedPagination, 
     PaginationRequest, 
     PaginationResponse, 
-    SortOrder
+    SortOrder,
+    PaginationType
 )
 
 class PDCLookupService:
@@ -34,6 +34,14 @@ class PDCLookupService:
     
     def __init__(self, db: Session):
         self.db = db
+    
+    def to_api_dict_type(self, lookup_type: PDCLookupType) -> Dict[str, Any]:
+        """Convert lookup type model to API response dictionary."""
+        return lookup_type.to_dict()
+    
+    def to_api_dict_code(self, lookup_code: PDCLookupCode) -> Dict[str, Any]:
+        """Convert lookup code model to API response dictionary."""
+        return lookup_code.to_dict()
 
     # ========================================
     # QUERY BUILDING AND FILTERING
@@ -409,13 +417,8 @@ class PDCLookupService:
             count_query=count_query
         )
         
-        # Serialize items
-        serialized_items = []
-        for item in items:
-            # Convert SQLAlchemy model to dict for Pydantic
-            item_dict = item.__dict__.copy()
-            item_dict.pop('_sa_instance_state', None)
-            serialized_items.append(item_dict)
+        # Serialize items using model's to_dict() method
+        serialized_items = [self.to_api_dict_type(item) for item in items]
         
         return {
             "items": serialized_items,
@@ -446,13 +449,8 @@ class PDCLookupService:
             count_query=count_query
         )
         
-        # Serialize items
-        serialized_items = []
-        for item in items:
-            # Convert SQLAlchemy model to dict for Pydantic
-            item_dict = item.__dict__.copy()
-            item_dict.pop('_sa_instance_state', None)
-            serialized_items.append(PDCLookupCodeResponse.model_validate(item_dict).model_dump())
+        # Serialize items using model's to_dict() method
+        serialized_items = [self.to_api_dict_code(item) for item in items]
         
         return {
             "items": serialized_items,
@@ -495,12 +493,8 @@ class PDCLookupService:
             previous_cursor=previous_cursor
         )
         
-        # Serialize items
-        serialized_items = []
-        for item in items:
-            item_dict = item.__dict__.copy()
-            item_dict.pop('_sa_instance_state', None)
-            serialized_items.append(item_dict)
+        # Serialize items using model's to_dict() method
+        serialized_items = [self.to_api_dict_type(item) for item in items]
         
         return {
             "items": serialized_items,
@@ -542,12 +536,8 @@ class PDCLookupService:
             previous_cursor=previous_cursor
         )
         
-        # Serialize items
-        serialized_items = []
-        for item in items:
-            item_dict = item.__dict__.copy()
-            item_dict.pop('_sa_instance_state', None)
-            serialized_items.append(PDCLookupCodeResponse.model_validate(item_dict).model_dump())
+        # Serialize items using model's to_dict() method
+        serialized_items = [self.to_api_dict_code(item) for item in items]
         
         return {
             "items": serialized_items,
@@ -663,12 +653,16 @@ class LookupPaginationQueryParser:
     @staticmethod
     def parse_pagination_params(request_params: Dict[str, str]) -> PaginationRequest:
         """Parse pagination parameters from request."""
+        # Determine pagination type based on use_cursor parameter
+        use_cursor = request_params.get('use_cursor', 'false').lower() == 'true'
+        pagination_type = PaginationType.CURSOR if use_cursor else PaginationType.OFFSET
+        
         return PaginationRequest(
             page=int(request_params.get('page', 1)),
             size=int(request_params.get('size', 20)),
             sort_by=request_params.get('sort_by', 'lookup_code'),
             sort_order=SortOrder(request_params.get('sort_order', 'asc')),
-            use_cursor=request_params.get('use_cursor', 'false').lower() == 'true',
+            pagination_type=pagination_type,
             cursor=request_params.get('cursor')
         )
     

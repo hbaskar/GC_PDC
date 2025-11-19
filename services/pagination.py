@@ -49,6 +49,11 @@ class PaginationRequest(BaseModel):
     def skip(self) -> int:
         """Calculate skip/offset value."""
         return (self.page - 1) * self.size
+    
+    @property
+    def use_cursor(self) -> bool:
+        """Check if cursor-based pagination should be used."""
+        return self.pagination_type == PaginationType.CURSOR
 
 class PaginationResponse(BaseModel):
     """Standardized pagination response model."""
