@@ -31,20 +31,24 @@ def get_classifications(req: func.HttpRequest) -> func.HttpResponse:
 
         # Parse pagination, filter, and search params
         request_params = dict(req.params)
-        # Pagination and filters are ignored for flat response
-        classifications, _ = service.get_all_simple()
-        from schemas.classification_schemas import PDCClassificationResponse
-        items = []
-        for c in classifications:
-            if c is not None:
-                try:
-                    item = PDCClassificationResponse.from_orm_with_retention(c).model_dump()
-                    items.append(item)
-                except Exception as ser_ex:
-                    logging.error(f"Serialization error for classification_id={getattr(c, 'classification_id', None)}: {ser_ex}")
-        response = {"items": items}
+        pagination = PaginationQueryParser.parse_pagination_params(request_params)
+        filters = PaginationQueryParser.parse_filter_params(request_params)
+        search = request_params.get("search")
+        minimal = request_params.get("minimal", "false").lower() == "true"
+        fields = request_params.get("fields")
+        if fields:
+            fields = [f.strip() for f in fields.split(",") if f.strip()]
+
+        # Use optimized paginated service (supports cursor and offset)
+        result = service.get_all_paginated_optimized(
+            pagination=pagination,
+            filters=filters,
+            search=search,
+            minimal=minimal,
+            fields=fields
+        )
         return func.HttpResponse(
-            json.dumps(response, default=str),
+            json.dumps(result, default=str),
             status_code=200,
             mimetype="application/json"
         )
