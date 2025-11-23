@@ -217,6 +217,7 @@ def get_session_local():
     
     return _SessionLocal
 
+
 def get_db():
     """Dependency to get database session."""
     SessionLocal = get_session_local()
@@ -225,3 +226,6 @@ def get_db():
         yield db
     finally:
         db.close()
+
+# Export Base for models
+Base = declarative_base()

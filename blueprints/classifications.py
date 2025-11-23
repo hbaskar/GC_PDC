@@ -1,7 +1,3 @@
-"""
-Classification API Blueprint
-Contains all classification-related endpoints with performance optimizations.
-"""
 import azure.functions as func
 import logging
 import math
@@ -9,6 +5,10 @@ import time
 from typing import Optional
 from functools import wraps
 from pydantic import ValidationError
+import json
+
+# Create blueprint
+bp = func.Blueprint()
 
 # Import dependencies
 from database.config import get_db
@@ -21,10 +21,41 @@ from schemas.classification_schemas import (
     PDCClassificationSummary,
     ErrorResponse
 )
-import json
 
-# Create blueprint
-bp = func.Blueprint()
+@bp.route(route="classifications", methods=["GET"])
+def get_classifications(req: func.HttpRequest) -> func.HttpResponse:
+    """Get all classifications with pagination, filtering, and enrichment."""
+    try:
+        db = next(get_db())
+        service = PDCClassificationService(db)
+
+        # Parse pagination, filter, and search params
+        request_params = dict(req.params)
+        # Pagination and filters are ignored for flat response
+        classifications, _ = service.get_all_simple()
+        from schemas.classification_schemas import PDCClassificationResponse
+        items = []
+        for c in classifications:
+            if c is not None:
+                try:
+                    item = PDCClassificationResponse.from_orm_with_retention(c).model_dump()
+                    items.append(item)
+                except Exception as ser_ex:
+                    logging.error(f"Serialization error for classification_id={getattr(c, 'classification_id', None)}: {ser_ex}")
+        response = {"items": items}
+        return func.HttpResponse(
+            json.dumps(response, default=str),
+            status_code=200,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        logging.error(f"Error getting classifications: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({"error": "Failed to get classifications", "detail": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )
+
 
 def monitor_performance(endpoint_name: str):
     """Decorator to monitor endpoint performance."""
@@ -43,95 +74,6 @@ def monitor_performance(endpoint_name: str):
                 raise
         return wrapper
     return decorator
-
-def create_error_response(message: str, status_code: int, detail: str = None) -> func.HttpResponse:
-    """Create standardized error response."""
-    error_response = ErrorResponse(
-        error=message,
-        detail=detail,
-        status_code=status_code
-    )
-    return func.HttpResponse(
-        error_response.model_dump_json(),
-        status_code=status_code,
-        mimetype="application/json"
-    )
-
-def create_success_response(data: dict, status_code: int = 200, compress: bool = False) -> func.HttpResponse:
-    """Create standardized success response with optional compression."""
-    import json
-    import gzip
-    
-    response_body = json.dumps(data, default=str)
-    
-    # Enable compression for large responses (>1KB) if requested
-    if compress and len(response_body) > 1024:
-        try:
-            compressed_body = gzip.compress(response_body.encode('utf-8'))
-            # Only use compression if it actually reduces size significantly
-            if len(compressed_body) < len(response_body) * 0.8:
-                return func.HttpResponse(
-                    compressed_body,
-                    status_code=status_code,
-                    headers={
-                        'Content-Type': 'application/json',
-                        'Content-Encoding': 'gzip'
-                    }
-                )
-        except Exception as e:
-            logging.warning(f"Compression failed, returning uncompressed: {str(e)}")
-    
-    return func.HttpResponse(
-        response_body,
-        status_code=status_code,
-        mimetype="application/json"
-    )
-
-@bp.route(route="classifications", methods=["GET"])
-@monitor_performance("get_all_classifications")
-def get_all_classifications(req: func.HttpRequest) -> func.HttpResponse:
-    """Get all PDC classifications with advanced pagination and performance optimizations."""
-    try:
-        db = next(get_db())
-        service = PDCClassificationService(db)
-        
-        # Parse query parameters
-        request_params = dict(req.params)
-        
-        # Performance optimization flags
-        minimal = request_params.get('minimal', 'false').lower() in ('true', '1', 'yes')
-        fields = request_params.get('fields', '').split(',') if request_params.get('fields') else None
-        compress_response = request_params.get('compress', 'true').lower() in ('true', '1', 'yes')
-        
-        # Parse pagination parameters
-        pagination = PaginationQueryParser.parse_pagination_params(request_params)
-        
-        # Parse filter parameters
-        filters = PaginationQueryParser.parse_filter_params(request_params)
-        
-        # Get search parameter
-        search = request_params.get('search', '').strip() or None
-        include_deleted = request_params.get('include_deleted', 'false').lower() in ('true', '1', 'yes')
-        
-        # Get paginated results with performance optimizations
-        result = service.get_all_paginated_optimized(
-            pagination=pagination,
-            filters=filters,
-            search=search,
-            include_deleted=include_deleted,
-            minimal=minimal,
-            fields=fields
-        )
-        
-        return create_success_response(result, compress=compress_response)
-    except Exception as e:
-        logging.error(f"Error getting classifications: {str(e)}")
-        return func.HttpResponse(
-            json.dumps({"error": str(e)}),
-            status_code=500,
-            mimetype="application/json"
-        )
-
 @bp.route(route="classifications/summary", methods=["GET"])
 @monitor_performance("get_classifications_summary")
 def get_classifications_summary(req: func.HttpRequest) -> func.HttpResponse:
@@ -271,16 +213,25 @@ def test_classification_performance(req: func.HttpRequest) -> func.HttpResponse:
                 }
             }
         
-        return create_success_response(results)
+        return func.HttpResponse(
+            json.dumps(results, default=str),
+            status_code=200,
+            mimetype="application/json"
+        )
         
     except Exception as e:
         logging.error(f"Performance test failed: {str(e)}")
-        return create_error_response("Performance test failed", 500, str(e))
+        return func.HttpResponse(
+            json.dumps({"error": "Performance test failed", "detail": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )
 
 @bp.route(route="classifications/{classification_id:int}", methods=["GET"])
 def get_classification(req: func.HttpRequest) -> func.HttpResponse:
     """Get a specific classification by ID."""
     try:
+        logging.info(f"Route params: {req.route_params}")
         classification_id = int(req.route_params.get('classification_id'))
         
         # Get database connection and service
@@ -288,19 +239,46 @@ def get_classification(req: func.HttpRequest) -> func.HttpResponse:
         service = PDCClassificationService(db)
         
         # Get classification
+        logging.info(f"Fetching classification_id: {classification_id}")
         classification = service.get_by_id(classification_id)
+        logging.info(f"Fetched classification: {classification}")
         if not classification:
-            return create_error_response("Classification not found", 404)
+            return func.HttpResponse(
+                json.dumps({"error": "Classification not found"}),
+                status_code=404,
+                mimetype="application/json"
+            )
         
-        # Convert to API dict format using model's to_dict method
-        response_data = service.to_api_dict(classification)
-        return create_success_response(response_data)
+        # Convert to API dict format using schema enrichment (includes retention fields)
+        try:
+            response_data = PDCClassificationResponse.from_orm_with_retention(classification).model_dump()
+            logging.info(f"Response data: {response_data}")
+            return func.HttpResponse(
+                json.dumps(response_data, default=str),
+                status_code=200,
+                mimetype="application/json"
+            )
+        except Exception as e:
+            logging.error(f"Error during schema enrichment: {str(e)}")
+            return func.HttpResponse(
+                json.dumps({"error": "Failed to serialize classification response", "detail": str(e)}),
+                status_code=500,
+                mimetype="application/json"
+            )
         
     except ValueError:
-        return create_error_response("Invalid classification ID", 400)
+        return func.HttpResponse(
+            json.dumps({"error": "Invalid classification ID"}),
+            status_code=400,
+            mimetype="application/json"
+        )
     except Exception as e:
         logging.error(f"Get classification failed: {str(e)}")
-        return create_error_response("Failed to retrieve classification", 500, str(e))
+        return func.HttpResponse(
+            json.dumps({"error": "Failed to retrieve classification", "detail": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )
 
 @bp.route(route="classifications", methods=["POST"])
 def create_classification(req: func.HttpRequest) -> func.HttpResponse:
@@ -310,16 +288,28 @@ def create_classification(req: func.HttpRequest) -> func.HttpResponse:
         try:
             req_body = req.get_json()
         except ValueError:
-            return create_error_response("Invalid JSON in request body", 400)
+            return func.HttpResponse(
+                json.dumps({"error": "Invalid JSON in request body"}),
+                status_code=400,
+                mimetype="application/json"
+            )
         
         if not req_body:
-            return create_error_response("Request body is required", 400)
+            return func.HttpResponse(
+                json.dumps({"error": "Request body is required"}),
+                status_code=400,
+                mimetype="application/json"
+            )
         
         # Validate data using Pydantic schema
         try:
             classification_data = PDCClassificationCreate(**req_body)
         except ValidationError as e:
-            return create_error_response("Validation error", 400, str(e))
+            return func.HttpResponse(
+                json.dumps({"error": "Validation error", "detail": str(e)}),
+                status_code=400,
+                mimetype="application/json"
+            )
         
         # Get database connection and service
         db = next(get_db())
@@ -330,11 +320,19 @@ def create_classification(req: func.HttpRequest) -> func.HttpResponse:
         
         # Convert to API dict format using model's to_dict method
         response_data = service.to_api_dict(new_classification)
-        return create_success_response(response_data, 201)
+        return func.HttpResponse(
+            json.dumps(response_data, default=str),
+            status_code=201,
+            mimetype="application/json"
+        )
         
     except Exception as e:
         logging.error(f"Create classification failed: {str(e)}")
-        return create_error_response("Failed to create classification", 500, str(e))
+        return func.HttpResponse(
+            json.dumps({"error": "Failed to create classification", "detail": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )
 
 @bp.route(route="classifications/{classification_id:int}", methods=["PUT"])
 def update_classification(req: func.HttpRequest) -> func.HttpResponse:
@@ -346,16 +344,28 @@ def update_classification(req: func.HttpRequest) -> func.HttpResponse:
         try:
             req_body = req.get_json()
         except ValueError:
-            return create_error_response("Invalid JSON in request body", 400)
+            return func.HttpResponse(
+                json.dumps({"error": "Invalid JSON in request body"}),
+                status_code=400,
+                mimetype="application/json"
+            )
         
         if not req_body:
-            return create_error_response("Request body is required", 400)
+            return func.HttpResponse(
+                json.dumps({"error": "Request body is required"}),
+                status_code=400,
+                mimetype="application/json"
+            )
         
         # Validate data using Pydantic schema
         try:
             classification_data = PDCClassificationUpdate(**req_body)
         except ValidationError as e:
-            return create_error_response("Validation error", 400, str(e))
+            return func.HttpResponse(
+                json.dumps({"error": "Validation error", "detail": str(e)}),
+                status_code=400,
+                mimetype="application/json"
+            )
         
         # Get database connection and service
         db = next(get_db())
@@ -364,17 +374,33 @@ def update_classification(req: func.HttpRequest) -> func.HttpResponse:
         # Update classification
         updated_classification = service.update(classification_id, classification_data)
         if not updated_classification:
-            return create_error_response("Classification not found", 404)
+            return func.HttpResponse(
+                json.dumps({"error": "Classification not found"}),
+                status_code=404,
+                mimetype="application/json"
+            )
         
         # Convert to API dict format using model's to_dict method
         response_data = service.to_api_dict(updated_classification)
-        return create_success_response(response_data)
+        return func.HttpResponse(
+            json.dumps(response_data, default=str),
+            status_code=200,
+            mimetype="application/json"
+        )
         
     except ValueError:
-        return create_error_response("Invalid classification ID", 400)
+        return func.HttpResponse(
+            json.dumps({"error": "Invalid classification ID"}),
+            status_code=400,
+            mimetype="application/json"
+        )
     except Exception as e:
         logging.error(f"Update classification failed: {str(e)}")
-        return create_error_response("Failed to update classification", 500, str(e))
+        return func.HttpResponse(
+            json.dumps({"error": "Failed to update classification", "detail": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )
 
 @bp.route(route="classifications/{classification_id:int}", methods=["DELETE"])
 def delete_classification(req: func.HttpRequest) -> func.HttpResponse:
@@ -392,17 +418,33 @@ def delete_classification(req: func.HttpRequest) -> func.HttpResponse:
         # Soft delete classification
         deleted_classification = service.soft_delete(classification_id, deleted_by)
         if not deleted_classification:
-            return create_error_response("Classification not found or already deleted", 404)
+            return func.HttpResponse(
+                json.dumps({"error": "Classification not found or already deleted"}),
+                status_code=404,
+                mimetype="application/json"
+            )
         
         # Convert to API dict format using model's to_dict method
         response_data = service.to_api_dict(deleted_classification)
-        return create_success_response(response_data)
+        return func.HttpResponse(
+            json.dumps(response_data, default=str),
+            status_code=200,
+            mimetype="application/json"
+        )
         
     except ValueError:
-        return create_error_response("Invalid classification ID", 400)
+        return func.HttpResponse(
+            json.dumps({"error": "Invalid classification ID"}),
+            status_code=400,
+            mimetype="application/json"
+        )
     except Exception as e:
         logging.error(f"Delete classification failed: {str(e)}")
-        return create_error_response("Failed to delete classification", 500, str(e))
+        return func.HttpResponse(
+            json.dumps({"error": "Failed to delete classification", "detail": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )
 
 @bp.route(route="classifications/{classification_id:int}/restore", methods=["POST"])
 def restore_classification(req: func.HttpRequest) -> func.HttpResponse:
@@ -420,14 +462,30 @@ def restore_classification(req: func.HttpRequest) -> func.HttpResponse:
         # Restore classification
         restored_classification = service.restore(classification_id, restored_by)
         if not restored_classification:
-            return create_error_response("Classification not found or not deleted", 404)
+            return func.HttpResponse(
+                json.dumps({"error": "Classification not found or not deleted"}),
+                status_code=404,
+                mimetype="application/json"
+            )
         
         # Convert to API dict format using model's to_dict method
         response_data = service.to_api_dict(restored_classification)
-        return create_success_response(response_data)
+        return func.HttpResponse(
+            json.dumps(response_data, default=str),
+            status_code=200,
+            mimetype="application/json"
+        )
         
     except ValueError:
-        return create_error_response("Invalid classification ID", 400)
+        return func.HttpResponse(
+            json.dumps({"error": "Invalid classification ID"}),
+            status_code=400,
+            mimetype="application/json"
+        )
     except Exception as e:
         logging.error(f"Restore classification failed: {str(e)}")
-        return create_error_response("Failed to restore classification", 500, str(e))
+        return func.HttpResponse(
+            json.dumps({"error": "Failed to restore classification", "detail": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )

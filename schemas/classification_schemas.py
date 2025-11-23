@@ -1,3 +1,4 @@
+
 """
 Pydantic schemas for PDC Classification API.
 Based on actual database table structure from CMSDEVDB.
@@ -118,6 +119,7 @@ class PDCClassificationUpdate(BaseModel):
     legal_hold_flag: Optional[bool] = Field(None, description="Legal hold flag (read-only)")
     review_frequency: Optional[str] = Field(None, max_length=50, description="How often to review retention (read-only)")
 
+
 class PDCClassificationResponse(BaseModel):
     """
     Schema for PDC Classification response - matches model's to_dict() output exactly.
@@ -180,6 +182,7 @@ class PDCClassificationResponse(BaseModel):
     retention_code: Optional[str] = Field(None, description="Retention code")
     retention_type: Optional[str] = Field(None, description="Type of retention")
     trigger_event: Optional[str] = Field(None, description="Event that triggers retention")
+    retention_period: Optional[int] = Field(None, description="Retention period in days")
     min_retention_years: Optional[int] = Field(None, description="Minimum retention years")
     max_retention_years: Optional[int] = Field(None, description="Maximum retention years")
     legal_hold_flag: Optional[bool] = Field(None, description="Legal hold flag")
@@ -190,45 +193,78 @@ class PDCClassificationResponse(BaseModel):
     
     model_config = {"extra": "allow"}
 
+    @classmethod
+    def from_orm_with_retention(cls, obj):
+        # Manually build dict, converting datetime fields before validation
+        data = {}
+        for field in cls.model_fields:
+            value = getattr(obj, field, None)
+            if value is not None:
+                if field in [
+                    'effective_date', 'created_at', 'modified_at', 'deleted_at', 'last_accessed_at'] and hasattr(value, 'isoformat'):
+                    data[field] = value.isoformat()
+                else:
+                    data[field] = value
+        # Add retention policy fields
+        rp = getattr(obj, 'retention_policy', None)
+        if rp:
+            data.update({
+                'retention_code': rp.retention_code,
+                'retention_type': rp.retention_type,
+                'trigger_event': rp.trigger_event,
+                'retention_period': rp.retention_period_days,
+                'min_retention_years': rp.retention_period_days // 365 if rp.retention_period_days else None,
+                'max_retention_years': (rp.retention_period_days // 365) + 2 if rp.retention_period_days else None,
+                'legal_hold_flag': False,
+                'destruction_method': rp.destruction_method,
+                'review_frequency': rp.review_frequency
+            })
+        else:
+            data.update({
+                'retention_code': None,
+                'retention_type': None,
+                'trigger_event': None,
+                'retention_period': None,
+                'min_retention_years': None,
+                'max_retention_years': None,
+                'legal_hold_flag': False,
+                'destruction_method': None,
+                'review_frequency': None
+            })
+        # Ensure library_id and library_name are always present
+        data['library_id'] = getattr(obj, 'library_id', None)
+        data['library_name'] = getattr(obj, 'library_name', None)
+        return cls(**data)
+
+
+# Paginated response schema for classifications
 class PDCClassificationList(BaseModel):
-    """Schema for paginated PDC Classification list."""
-    items: List[PDCClassificationResponse]
     total: int
     page: int
-    size: int
-    pages: int
+    per_page: int
+    items: List["PDCClassificationResponse"]
 
-class PDCClassificationSummary(BaseModel):
-    """Schema for simplified classification summary."""
-    # Primary identifiers
-    classification_id: int
-    name: str
-    classification_code: str
-    
-    # Key classification attributes  
-    classification_level: Optional[str] = None
-    sensitivity_rating: Optional[int] = None
-    media_type: Optional[str] = None
-    file_type: Optional[str] = None
-    series: Optional[str] = None
-    
-    # Status
-    is_active: bool = True
-    status: Optional[str] = None
-    
-    # Relationships
-    retention_policy_id: Optional[int] = None
-    template_id: Optional[int] = None
-    organization_id: Optional[int] = None
-    
-    # Computed/joined fields
-    template_name: Optional[str] = Field(None, description="Template name (resolved from template_id)")
-    retention_code: Optional[str] = Field(None, description="Retention code from policy")
-    
-    model_config = {"from_attributes": True}
+    model_config = {"extra": "allow"}
+
+    # Forward reference resolution for Pydantic v2+
+    @classmethod
+    def update_forward_refs(cls):
+        super().model_rebuild()
 
 class ErrorResponse(BaseModel):
     """Schema for error responses."""
     error: str
     detail: Optional[str] = None
     status_code: int
+
+# Summary schema for lightweight classification listings
+class PDCClassificationSummary(BaseModel):
+    classification_id: int
+    classification_code: str
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    retention_policy_id: Optional[int] = None
+    organization_id: Optional[int] = None
+
+    model_config = {"extra": "allow"}

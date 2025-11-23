@@ -1,0 +1,295 @@
+{
+  "info": {
+    "name": "PDC Libraries, Classifications & Retentions API",
+    "description": "Unified Postman collection for CRUD operations and tests for Libraries, Classifications, and Retention Policies endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:7071", "type": "string" },
+    { "key": "library_id", "value": "", "type": "string" },
+    { "key": "classification_id", "value": "", "type": "string" },
+    { "key": "retention_policy_id", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Libraries",
+      "item": [
+        {
+          "name": "Get All Libraries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/libraries",
+              "host": ["{{base_url}}"],
+              "path": ["api", "libraries"]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Get all libraries returns 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "pm.test('Response has items array', function () {",
+                "  const responseJson = pm.response.json();",
+                "  pm.expect(responseJson).to.have.property('items');",
+                "  pm.expect(responseJson.items).to.be.an('array');",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Get Library by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/libraries/{{library_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "libraries", "{{library_id}}"]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Get library by ID returns 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "pm.test('Library has correct structure', function () {",
+                "  const responseJson = pm.response.json();",
+                "  pm.expect(responseJson).to.have.property('library_id');",
+                "  pm.expect(responseJson).to.have.property('name');",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Create Library",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Library\",\n  \"description\": \"Created via Postman\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/libraries",
+              "host": ["{{base_url}}"],
+              "path": ["api", "libraries"]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Create library returns 201', function () {",
+                "  pm.response.to.have.status(201);",
+                "});",
+                "pm.test('Created library has correct structure', function () {",
+                "  const responseJson = pm.response.json();",
+                "  pm.expect(responseJson).to.have.property('library_id');",
+                "  pm.expect(responseJson).to.have.property('name');",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Update Library",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Library\",\n  \"description\": \"Updated via Postman\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/libraries/{{library_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "libraries", "{{library_id}}"]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Update library returns 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "pm.test('Updated library has correct structure', function () {",
+                "  const responseJson = pm.response.json();",
+                "  pm.expect(responseJson).to.have.property('library_id');",
+                "  pm.expect(responseJson).to.have.property('name');",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Delete Library",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/libraries/{{library_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "libraries", "{{library_id}}"]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Delete library returns 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "pm.test('Delete response has correct structure', function () {",
+                "  const responseJson = pm.response.json();",
+                "  pm.expect(responseJson).to.have.property('library_id');",
+                "  pm.expect(responseJson).to.have.property('is_deleted');",
+                "});"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "Classifications",
+      "item": [
+        {
+          "name": "Get All Classifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications",
+              "host": ["{{base_url}}"],
+              "path": ["api", "classifications"]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Get all classifications returns 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "pm.test('Response has items array', function () {",
+                "  const responseJson = pm.response.json();",
+                "  pm.expect(responseJson).to.have.property('items');",
+                "  pm.expect(responseJson.items).to.be.an('array');",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Get Classification by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications/{{classification_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "classifications", "{{classification_id}}"]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Get classification by ID returns 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "pm.test('Classification has correct structure', function () {",
+                "  const responseJson = pm.response.json();",
+                "  pm.expect(responseJson).to.have.property('classification_id');",
+                "  pm.expect(responseJson).to.have.property('name');",
+                "});"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "Retentions",
+      "item": [
+        {
+          "name": "Get All Retention Policies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies"]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Get all retention policies returns 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "pm.test('Response has items array', function () {",
+                "  const responseJson = pm.response.json();",
+                "  pm.expect(responseJson).to.have.property('items');",
+                "  pm.expect(responseJson.items).to.be.an('array');",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Get Retention Policy by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies/{{retention_policy_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies", "{{retention_policy_id}}"]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Get retention policy by ID returns 200', function () {",
+                "  pm.response.to.have.status(200);",
+                "});",
+                "pm.test('Retention policy has correct structure', function () {",
+                "  const responseJson = pm.response.json();",
+                "  pm.expect(responseJson).to.have.property('retention_policy_id');",
+                "  pm.expect(responseJson).to.have.property('name');",
+                "});"
+              ]
+            }
+          }]
+        }
+      ]
+    }
+  ]
+}

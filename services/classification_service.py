@@ -37,15 +37,12 @@ class PDCClassificationService:
     
     def to_api_dict(self, classification: PDCClassification) -> Dict[str, Any]:
         """Convert classification model to API dictionary format using model's to_dict()."""
-        # Use the model's to_dict method which handles all field mapping
         data = classification.to_dict()
-        
         # Add template name if template exists
         if hasattr(classification, 'template') and classification.template:
             data['template_name'] = classification.template.template_name
         else:
             data['template_name'] = None
-                
         return data
     
     # ========================================
@@ -64,7 +61,14 @@ class PDCClassificationService:
         from models.pdc_retention_policy import PDCRetentionPolicy
         
         # Start with base query
+        from sqlalchemy.orm import joinedload
         query = self.db.query(PDCClassification)
+        # Eagerly load relationships for API serialization
+        query = query.options(
+            joinedload(PDCClassification.library),
+            joinedload(PDCClassification.retention_policy),
+            joinedload(PDCClassification.template)
+        )
         
         # Smart join logic: only join retention policy when ACTUALLY needed
         needs_retention_join = False
@@ -311,7 +315,8 @@ class PDCClassificationService:
     
     def get_by_id(self, classification_id: int, include_deleted: bool = False) -> Optional[PDCClassification]:
         """Get PDC Classification by ID with template information."""
-        query = self._build_base_query(include_deleted=include_deleted, include_template=True)
+        # Always join retention policy for single-record fetches to ensure relationship is loaded
+        query = self._build_base_query(include_deleted=include_deleted, include_template=True, include_retention=True)
         return query.filter(PDCClassification.classification_id == classification_id).first()
     
     def get_by_code(self, code: str, include_deleted: bool = False) -> Optional[PDCClassification]:
@@ -565,7 +570,6 @@ class PDCClassificationService:
         fields: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """Optimized offset-based pagination with minimal responses."""
-        
         # Apply pagination
         items, pagination_response = AdvancedPagination.offset_pagination(
             query=query,
@@ -573,21 +577,39 @@ class PDCClassificationService:
             pagination=pagination,
             count_query=count_query
         )
-        
+        # Ensure items are ORM objects (not dicts)
+        orm_items = []
+        for item in items:
+            if isinstance(item, dict):
+                # If item is a dict, try to fetch ORM object by ID
+                classification_id = item.get('classification_id') or item.get('id')
+                if classification_id:
+                    orm_item = self.get_by_id(classification_id)
+                    if orm_item:
+                        orm_items.append(orm_item)
+                    else:
+                        orm_items.append(item)
+                else:
+                    orm_items.append(item)
+            else:
+                orm_items.append(item)
         # Convert items to API dict format with optimizations
         serialized_items = []
-        for item in items:
+        for item in orm_items:
+            if item is None:
+                logging.error("Paginated response contains None item. Skipping.")
+                continue
+            logging.info(f"Paginated item type: {type(item)} | Value: {repr(item)}")
             if minimal:
                 api_data = self._create_minimal_response_dict(item)
             else:
                 api_data = self.to_api_dict(item)
-                
-            # Apply field filtering if specified
+            if api_data is None:
+                logging.error(f"Serialization produced None for item: {repr(item)}. Skipping.")
+                continue
             if fields:
                 api_data = self._filter_response_fields(api_data, fields)
-                
             serialized_items.append(api_data)
-        
         return {
             "items": serialized_items,
             "pagination": pagination_response.model_dump(),
@@ -612,17 +634,14 @@ class PDCClassificationService:
         fields: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """Optimized cursor-based pagination with minimal responses."""
-        
         # Determine cursor field and value
         cursor_field = getattr(PDCClassification, pagination.sort_by, PDCClassification.classification_id)
         cursor_value = None
-        
         if pagination.cursor:
             try:
                 cursor_value = int(pagination.cursor)
             except ValueError:
                 cursor_value = None
-        
         # Apply cursor pagination
         items, next_cursor, previous_cursor = AdvancedPagination.cursor_pagination(
             query=query,
@@ -632,7 +651,21 @@ class PDCClassificationService:
             limit=pagination.size,
             sort_order=SortOrder.DESC  # Newest first for cursor pagination
         )
-        
+        # Ensure items are ORM objects (not dicts)
+        orm_items = []
+        for item in items:
+            if isinstance(item, dict):
+                classification_id = item.get('classification_id') or item.get('id')
+                if classification_id:
+                    orm_item = self.get_by_id(classification_id)
+                    if orm_item:
+                        orm_items.append(orm_item)
+                    else:
+                        orm_items.append(item)
+                else:
+                    orm_items.append(item)
+            else:
+                orm_items.append(item)
         # Create pagination response
         pagination_response = PaginationResponse.from_cursor_pagination(
             page=pagination.page,
@@ -641,21 +674,23 @@ class PDCClassificationService:
             next_cursor=next_cursor,
             previous_cursor=previous_cursor
         )
-        
         # Convert items to API dict format with optimizations
         serialized_items = []
-        for item in items:
+        for item in orm_items:
+            if item is None:
+                logging.error("Paginated response contains None item. Skipping.")
+                continue
+            logging.info(f"Paginated item type: {type(item)} | Value: {repr(item)}")
             if minimal:
                 api_data = self._create_minimal_response_dict(item)
             else:
                 api_data = self.to_api_dict(item)
-                
-            # Apply field filtering if specified
+            if api_data is None:
+                logging.error(f"Serialization produced None for item: {repr(item)}. Skipping.")
+                continue
             if fields:
                 api_data = self._filter_response_fields(api_data, fields)
-                
             serialized_items.append(api_data)
-        
         return {
             "items": serialized_items,
             "pagination": pagination_response.model_dump(),
