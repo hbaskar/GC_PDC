@@ -18,6 +18,7 @@ class PDCClassificationBase(BaseModel):
     # Required relationships
     retention_policy_id: int = Field(..., description="Associated retention policy ID")
     organization_id: int = Field(..., description="Organization ID")
+    library_id: Optional[int] = Field(None, description="Library ID")
     
     # Retention condition fields
     condition_event: Optional[str] = Field(None, max_length=100, description="Trigger event for retention")
@@ -45,6 +46,9 @@ class PDCClassificationBase(BaseModel):
     # Ownership and access
     record_owner_id: Optional[int] = Field(None, description="Record owner user ID")
     record_owner: Optional[str] = Field(None, max_length=100, description="Record owner name")
+    record_office: Optional[str] = Field(None, max_length=100, description="Record office name")
+    purpose: Optional[str] = Field(None, max_length=250, description="Classification purpose (extended)")
+    active_storage: Optional[str] = Field(None, max_length=100, description="Active storage location")
     
     # Status fields
     is_active: bool = Field(True, description="Whether the classification is active")
@@ -103,6 +107,9 @@ class PDCClassificationUpdate(BaseModel):
     # Ownership and access
     record_owner_id: Optional[int] = Field(None, description="Record owner user ID")
     record_owner: Optional[str] = Field(None, max_length=100, description="Record owner name")
+    record_office: Optional[str] = Field(None, max_length=100, description="Record office name")
+    purpose: Optional[str] = Field(None, max_length=250, description="Classification purpose (extended)")
+    active_storage: Optional[str] = Field(None, max_length=100, description="Active storage location")
     
     # Status fields
     is_active: Optional[bool] = Field(None, description="Whether the classification is active")
@@ -148,6 +155,8 @@ class PDCClassificationResponse(BaseModel):
     see: Optional[str] = Field(None, description="Reference to other documents")
     
     # Classification attributes (DB field names)
+    stream: Optional[str] = Field(None, description="Stream name (computed from organization)")
+    business_unit: Optional[str] = Field(None, description="Business unit name (computed from organization)")
     file_type: Optional[str] = Field(None, description="File type")
     series: Optional[str] = Field(None, description="Document series")
     classification_level: Optional[str] = Field(None, description="Security classification level")
@@ -162,6 +171,9 @@ class PDCClassificationResponse(BaseModel):
     # Ownership and access
     record_owner_id: Optional[int] = Field(None, description="Record owner user ID")
     record_owner: Optional[str] = Field(None, description="Record owner name")
+    record_office: Optional[str] = Field(None, description="Record office name")
+    purpose: Optional[str] = Field(None, description="Classification purpose (extended)")
+    active_storage: Optional[str] = Field(None, description="Active storage location")
     
     # Status and lifecycle fields (DB format)
     is_active: Optional[bool] = Field(None, description="Whether the classification is active")
@@ -234,6 +246,11 @@ class PDCClassificationResponse(BaseModel):
         # Ensure library_id and library_name are always present
         data['library_id'] = getattr(obj, 'library_id', None)
         data['library_name'] = getattr(obj, 'library_name', None)
+        # Add stream and business_unit fields
+        data['stream'] = getattr(obj, 'stream', None)
+        data['business_unit'] = getattr(obj, 'business_unit', None)
+        # Add template_name field
+        data['template_name'] = getattr(obj.template, 'template_name', None) if getattr(obj, 'template', None) else None
         return cls(**data)
 
 

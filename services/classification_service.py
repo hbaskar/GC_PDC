@@ -292,16 +292,38 @@ class PDCClassificationService:
             
         db_data = {
             'code': create_dict.get('classification_code'),
-            'name': create_dict.get('name') or create_dict.get('classification_code'),  # Use name if provided, otherwise code
+            'name': create_dict.get('name') or create_dict.get('classification_code'),
             'description': create_dict.get('description'),
-            'is_active': create_dict.get('is_active', True),  # Default to True
-            'classification_level': create_dict.get('classification_level'),
-            'media_type': create_dict.get('media_type'),
+            'old_classification_id': create_dict.get('old_classification_id'),
+            'retention_policy_id': create_dict.get('retention_policy_id'),
+            'organization_id': create_dict.get('organization_id', 1),
+            'library_id': create_dict.get('library_id'),
+            'condition_event': create_dict.get('condition_event'),
+            'condition_offset_days': create_dict.get('condition_offset_days'),
+            'condition_type': create_dict.get('condition_type'),
+            'destruction_method': create_dict.get('destruction_method'),
+            'condition': create_dict.get('condition'),
+            'vital': create_dict.get('vital'),
+            'citation': create_dict.get('citation'),
+            'see': create_dict.get('see'),
             'file_type': file_type_value,
             'series': create_dict.get('series'),
-            'retention_policy_id': create_dict.get('retention_policy_id'),
-            'organization_id': create_dict.get('organization_id', 1),  # Use provided or default to 1
-            'created_by': 'api_user',  # Default user
+            'classification_level': create_dict.get('classification_level'),
+            'sensitivity_rating': create_dict.get('sensitivity_rating'),
+            'media_type': create_dict.get('media_type'),
+            'template_id': create_dict.get('template_id'),
+            'classification_purpose': create_dict.get('classification_purpose'),
+            'requires_tax_clearance': create_dict.get('requires_tax_clearance'),
+            'label_format': create_dict.get('label_format'),
+            'secure': create_dict.get('secure'),
+            'effective_date': create_dict.get('effective_date'),
+            'record_owner_id': create_dict.get('record_owner_id'),
+            'record_owner': create_dict.get('record_owner'),
+            'record_office': create_dict.get('record_office'),
+            'purpose': create_dict.get('purpose'),
+            'active_storage': create_dict.get('active_storage'),
+            'is_active': create_dict.get('is_active', True),
+            'created_by': create_dict.get('created_by', 'api_user'),
         }
         
         # Remove None values
@@ -380,6 +402,7 @@ class PDCClassificationService:
         
         # Set deletion fields
         db_classification.is_deleted = True
+        db_classification.is_active = False  # Mark as inactive when deleted
         db_classification.deleted_at = datetime.utcnow()
         db_classification.deleted_by = deleted_by
         db_classification.modified_at = datetime.utcnow()
@@ -456,21 +479,23 @@ class PDCClassificationService:
             include_retention=needs_retention
         )
         
-        # Use smart pagination strategy
-        if pagination.page > 5 or pagination.size > 50:
-            # Use cursor pagination for large datasets/later pages
-            pagination.pagination_type = PaginationType.CURSOR
+        # Always use cursor pagination if explicitly requested
+        if getattr(pagination, 'pagination_type', None) == PaginationType.CURSOR or getattr(pagination, 'use_cursor', False):
             result = self._cursor_paginated_response_optimized(query, pagination, minimal, fields)
         else:
-            # Use offset pagination for small datasets/early pages
-            count_query = self._build_base_query(
-                filters=filters, 
-                search=search, 
-                include_deleted=include_deleted,
-                include_template=False,  # Don't join template for count
-                include_retention=needs_retention
-            )
-            result = self._offset_paginated_response_optimized(query, count_query, pagination, filters or {}, search or "", minimal, fields)
+            # Use smart pagination strategy
+            if pagination.page > 5 or pagination.size > 50:
+                pagination.pagination_type = PaginationType.CURSOR
+                result = self._cursor_paginated_response_optimized(query, pagination, minimal, fields)
+            else:
+                count_query = self._build_base_query(
+                    filters=filters, 
+                    search=search, 
+                    include_deleted=include_deleted,
+                    include_template=False,  # Don't join template for count
+                    include_retention=needs_retention
+                )
+                result = self._offset_paginated_response_optimized(query, count_query, pagination, filters or {}, search or "", minimal, fields)
         
         # Add performance metrics
         execution_time = (time.time() - start_time) * 1000
@@ -635,7 +660,8 @@ class PDCClassificationService:
     ) -> Dict[str, Any]:
         """Optimized cursor-based pagination with minimal responses."""
         # Determine cursor field and value
-        cursor_field = getattr(PDCClassification, pagination.sort_by, PDCClassification.classification_id)
+        # Always use string name for cursor_field
+        cursor_field_name = pagination.sort_by if isinstance(pagination.sort_by, str) else 'classification_id'
         cursor_value = None
         if pagination.cursor:
             try:
@@ -643,13 +669,21 @@ class PDCClassificationService:
             except ValueError:
                 cursor_value = None
         # Apply cursor pagination
+        # Ensure sort_order is always an Enum, not a string, and robust to invalid values
+        if isinstance(pagination.sort_order, SortOrder):
+            sort_order = pagination.sort_order
+        else:
+            try:
+                sort_order = SortOrder(str(pagination.sort_order).lower())
+            except ValueError:
+                sort_order = SortOrder.DESC
         items, next_cursor, previous_cursor = AdvancedPagination.cursor_pagination(
             query=query,
             model_class=PDCClassification,
-            cursor_field=cursor_field,
+            cursor_field=cursor_field_name,
             cursor_value=cursor_value,
             limit=pagination.size,
-            sort_order=SortOrder.DESC  # Newest first for cursor pagination
+            sort_order=sort_order  # Always Enum
         )
         # Ensure items are ORM objects (not dicts)
         orm_items = []
@@ -695,8 +729,8 @@ class PDCClassificationService:
             "items": serialized_items,
             "pagination": pagination_response.model_dump(),
             "sort_info": {
-                "sort_by": cursor_field.name if hasattr(cursor_field, 'name') else 'classification_id',
-                "sort_order": "desc",
+                "sort_by": cursor_field_name,
+                "sort_order": pagination.sort_order.value if hasattr(pagination.sort_order, "value") else str(pagination.sort_order),
                 "pagination_type": "cursor"
             },
             "response_optimizations": {

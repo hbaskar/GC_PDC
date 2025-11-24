@@ -6,6 +6,30 @@ class PDCClassification(Base):
     """Model for pdc_classifications table."""
     __tablename__ = "pdc_classifications"
 
+    # Computed fields for stream and business_unit
+    @property
+    def stream(self):
+        if hasattr(self, 'organization') and hasattr(self.organization, 'organization_id'):
+            service = self._get_organization_service()
+            result = service.get_stream_and_business_unit(self.organization.organization_id)
+            return result.get('stream') if result else None
+        return None
+
+    @property
+    def business_unit(self):
+        if hasattr(self, 'organization') and hasattr(self.organization, 'organization_id'):
+            service = self._get_organization_service()
+            result = service.get_stream_and_business_unit(self.organization.organization_id)
+            return result.get('business_unit') if result else None
+        return None
+
+    def _get_organization_service(self):
+        # Import and create service instance (assumes global session available)
+        from services.organization_service import PDCOrganizationService
+        from sqlalchemy.orm import object_session
+        session = object_session(self)
+        return PDCOrganizationService(session)
+
     classification_id = Column(Integer, primary_key=True, nullable=False)
     name = Column(String(100), nullable=False, index=True)
     code = Column(String(50), nullable=False, index=True)
@@ -35,6 +59,9 @@ class PDCClassification(Base):
     organization_id = Column(Integer, ForeignKey("pdc_organizations.organization_id"), nullable=False)
     record_owner_id = Column(Integer)
     record_owner = Column(String(100))
+    record_office = Column(String(100))
+    purpose = Column(String(250))
+    active_storage = Column(String(100))
     is_active = Column(Boolean, nullable=False, server_default=text('((1))'))
     created_at = Column(DateTime, nullable=False, server_default=func.getdate())
     created_by = Column(String(100), nullable=False)
@@ -60,58 +87,63 @@ class PDCClassification(Base):
         return f"<PDCClassification(id={self.classification_id}, name='{self.name}', code='{self.code}')>"
 
     def to_dict(self):
-        """Convert model instance to dictionary with all database columns and log values for debugging. Always returns a valid dict."""
+        """Convert model instance to dictionary with all database columns. Always returns a valid dict and never assigns to None."""
         import logging
         try:
-            base_dict = {
-                # Primary identifiers
-                'classification_id': self.classification_id,
-                'classification_code': self.code,  # API-friendly field name
-                'name': self.name,
-                'description': self.description,
-                'old_classification_id': self.old_classification_id,
-                # Retention and policy fields
-                'retention_policy_id': self.retention_policy_id,
-                'condition_event': self.condition_event,
-                'condition_offset_days': self.condition_offset_days,
-                'condition_type': self.condition_type,
-                'destruction_method': self.destruction_method,
-                'condition': self.condition,
-                'vital': self.vital,
-                'citation': self.citation,
-                'see': self.see,
-                # Classification attributes
-                'file_type': self.file_type,
-                'series': self.series,
-                'classification_level': self.classification_level,
-                'sensitivity_rating': self.sensitivity_rating,
-                'media_type': self.media_type,
-                'template_id': self.template_id,
-                'template_name': self.template.template_name if self.template else None,
-                'library_id': self.library_id,
-                'library_name': self.library.name if self.library else None,
-                'classification_purpose': self.classification_purpose,
-                'requires_tax_clearance': self.requires_tax_clearance,
-                'label_format': self.label_format,
-                'secure': self.secure,
-                'effective_date': self.effective_date.isoformat() if self.effective_date else None,
-                # Organizational fields
-                'organization_id': self.organization_id,
-                'record_owner_id': self.record_owner_id,
-                'record_owner': self.record_owner,
-                # Status and lifecycle fields
-                'is_active': self.is_active,
-                'status': 'active' if self.is_active else 'inactive',  # API-friendly status
-                'created_at': self.created_at.isoformat() if self.created_at else None,
-                'created_by': self.created_by,
-                'modified_at': self.modified_at.isoformat() if self.modified_at else None,
-                'modified_by': self.modified_by,
-                'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
-                'deleted_by': self.deleted_by,
-                'is_deleted': self.is_deleted,
-                'last_accessed_at': self.last_accessed_at.isoformat() if self.last_accessed_at else None,
-                'last_accessed_by': self.last_accessed_by,
-            }
+            base_dict = dict()
+            # Primary identifiers
+            base_dict['classification_id'] = self.classification_id
+            base_dict['classification_code'] = self.code
+            base_dict['name'] = self.name
+            base_dict['description'] = self.description
+            base_dict['old_classification_id'] = self.old_classification_id
+            # Retention and policy fields
+            base_dict['retention_policy_id'] = self.retention_policy_id
+            base_dict['condition_event'] = self.condition_event
+            base_dict['condition_offset_days'] = self.condition_offset_days
+            base_dict['condition_type'] = self.condition_type
+            base_dict['destruction_method'] = self.destruction_method
+            base_dict['condition'] = self.condition
+            base_dict['vital'] = self.vital
+            base_dict['citation'] = self.citation
+            base_dict['see'] = self.see
+            # Classification attributes
+            base_dict['file_type'] = self.file_type
+            base_dict['series'] = self.series
+            base_dict['classification_level'] = self.classification_level
+            base_dict['sensitivity_rating'] = self.sensitivity_rating
+            base_dict['media_type'] = self.media_type
+            base_dict['template_id'] = self.template_id
+            base_dict['template_name'] = getattr(self.template, 'template_name', None) if self.template else None
+            base_dict['library_id'] = self.library_id
+            base_dict['library_name'] = getattr(self.library, 'name', None) if self.library else None
+            base_dict['classification_purpose'] = self.classification_purpose
+            base_dict['requires_tax_clearance'] = self.requires_tax_clearance
+            base_dict['label_format'] = self.label_format
+            base_dict['secure'] = self.secure
+            base_dict['effective_date'] = self.effective_date.isoformat() if self.effective_date else None
+            # Organizational fields
+            base_dict['organization_id'] = self.organization_id
+            base_dict['record_owner_id'] = self.record_owner_id
+            base_dict['record_owner'] = self.record_owner
+            base_dict['record_office'] = self.record_office
+            base_dict['purpose'] = self.purpose
+            base_dict['active_storage'] = self.active_storage
+            # Status and lifecycle fields
+            base_dict['is_active'] = self.is_active
+            base_dict['status'] = 'active' if self.is_active else 'inactive'
+            base_dict['created_at'] = self.created_at.isoformat() if self.created_at else None
+            base_dict['created_by'] = self.created_by
+            base_dict['modified_at'] = self.modified_at.isoformat() if self.modified_at else None
+            base_dict['modified_by'] = self.modified_by
+            base_dict['deleted_at'] = self.deleted_at.isoformat() if self.deleted_at else None
+            base_dict['deleted_by'] = self.deleted_by
+            base_dict['is_deleted'] = self.is_deleted
+            base_dict['last_accessed_at'] = self.last_accessed_at.isoformat() if self.last_accessed_at else None
+            base_dict['last_accessed_by'] = self.last_accessed_by
+            # Add stream and business_unit fields
+            base_dict['stream'] = self.stream
+            base_dict['business_unit'] = self.business_unit
             logging.info(f"to_dict serialization for classification_id={self.classification_id}: {base_dict}")
             return base_dict
         except Exception as ex:

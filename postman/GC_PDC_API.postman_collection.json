@@ -1,0 +1,1259 @@
+{
+  "info": {
+    "_postman_id": "gc-pdc-api-collection",
+    "name": "GC_PDC_API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Classifications",
+      "item": [
+        {
+          "name": "Get Classifications (Cursor Pagination)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get classifications (cursor) returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has cursor pagination structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('items');",
+                  "    pm.expect(responseJson).to.have.property('pagination');",
+                  "    const pagination = responseJson.pagination;",
+                  "    pm.expect(pagination).to.have.property('next_cursor');",
+                  "    pm.expect(pagination).to.have.property('previous_cursor');",
+                  "    pm.expect(pagination).to.have.property('has_next');",
+                  "    pm.expect(pagination).to.have.property('has_previous');",
+                  "    pm.expect(responseJson.items).to.be.an('array');",
+                  "});",
+                  "pm.test('Classifications have required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstItem = responseJson.items[0];",
+                  "        pm.expect(firstItem).to.have.property('id');",
+                  "        pm.expect(firstItem).to.have.property('classification_id');",
+                  "        pm.expect(firstItem).to.have.property('classification_code');",
+                  "        pm.expect(firstItem).to.have.property('name');",
+                  "        pm.expect(firstItem).to.have.property('code');",
+                  "        pm.expect(firstItem).to.have.property('status');",
+                  "    }",
+                  "});",
+                  "pm.test('Cursor pagination returns next_cursor when more records exist', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const pagination = responseJson.pagination;",
+                  "    if (pagination.has_next) {",
+                  "        pm.expect(pagination.next_cursor).to.not.be.null;",
+                  "    }",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications/cursor?size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "classifications", "cursor"],
+              "query": [
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Classifications",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get all classifications returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has new pagination structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('items');",
+                  "    pm.expect(responseJson).to.have.property('pagination');",
+                  "    pm.expect(responseJson).to.have.property('metadata');",
+                  "    const pagination = responseJson.pagination;",
+                  "    pm.expect(pagination).to.have.property('page');",
+                  "    pm.expect(pagination).to.have.property('size');",
+                  "    pm.expect(pagination).to.have.property('total');",
+                  "    pm.expect(pagination).to.have.property('pages');",
+                  "    pm.expect(pagination).to.have.property('has_next');",
+                  "    pm.expect(pagination).to.have.property('has_previous');",
+                  "    const metadata = responseJson.metadata;",
+                  "    pm.expect(metadata).to.have.property('sort_info');",
+                  "    pm.expect(metadata).to.have.property('execution_time_ms');",
+                  "    pm.expect(responseJson.items).to.be.an('array');",
+                  "});",
+                  "pm.test('Classifications have required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstItem = responseJson.items[0];",
+                  "        pm.expect(firstItem).to.have.property('id');",
+                  "        pm.expect(firstItem).to.have.property('classification_id');",
+                  "        pm.expect(firstItem).to.have.property('classification_code');",
+                  "        pm.expect(firstItem).to.have.property('name');",
+                  "        pm.expect(firstItem).to.have.property('code');",
+                  "        pm.expect(firstItem).to.have.property('status');",
+                  "        pm.collectionVariables.set('classification_id', firstItem.classification_id);",
+                  "    }",
+                  "});",
+                  "pm.test('🆕 v4.0.0: Classifications include template names', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstItem = responseJson.items[0];",
+                  "        pm.expect(firstItem).to.have.property('template_name');",
+                  "        if (firstItem.template_name !== null) {",
+                  "            pm.expect(firstItem.template_name).to.be.a('string');",
+                  "            pm.collectionVariables.set('expected_template_name', firstItem.template_name);",
+                  "        }",
+                  "        console.log('✅ Template name field found:', firstItem.template_name);",
+                  "    }",
+                  "});",
+                  "pm.test('Pagination math is correct', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const pagination = responseJson.pagination;",
+                  "    pm.expect(pagination.page).to.be.at.least(1);",
+                  "    pm.expect(pagination.size).to.be.at.least(1);",
+                  "    pm.expect(pagination.total).to.be.at.least(0);",
+                  "    if (pagination.total > 0) {",
+                  "        const expectedPages = Math.ceil(pagination.total / pagination.size);",
+                  "        pm.expect(pagination.pages).to.equal(expectedPages);",
+                  "    }",
+                  "});",
+                  "pm.test('🆕 v4.1.0: Classifications include retention policy fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstItem = responseJson.items[0];",
+                  "        pm.expect(firstItem).to.have.property('retention_policy_id');",
+                  "        pm.expect(firstItem).to.have.property('retention_code');",
+                  "        pm.expect(firstItem).to.have.property('retention_type');",
+                  "        pm.expect(firstItem).to.have.property('min_retention_years');",
+                  "        pm.expect(firstItem).to.have.property('max_retention_years');",
+                  "        pm.expect(firstItem).to.have.property('legal_hold_flag');",
+                  "        console.log('✅ v4.1.0: Retention policy fields found:');",
+                  "        console.log('  - Code:', firstItem.retention_code);",
+                  "        console.log('  - Type:', firstItem.retention_type);",
+                  "        console.log('  - Years:', firstItem.min_retention_years + '-' + firstItem.max_retention_years);",
+                  "    }",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications?page=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "classifications"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Classification By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get classification by ID returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has correct classification ID', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('id', pm.variables.get('classification_id'));",
+                  "});",
+                  "pm.test('Response has required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('id');",
+                  "    pm.expect(responseJson).to.have.property('classification_id');",
+                  "    pm.expect(responseJson).to.have.property('classification_code');",
+                  "    pm.expect(responseJson).to.have.property('name');",
+                  "    pm.expect(responseJson).to.have.property('code');",
+                  "    pm.expect(responseJson).to.have.property('status');",
+                  "});",
+                  "pm.test('🆕 v4.0.0: Classification includes template name', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('template_name');",
+                  "    if (responseJson.template_name !== null) {",
+                  "        pm.expect(responseJson.template_name).to.be.a('string');",
+                  "    }",
+                  "});",
+                  "pm.test('🆕 v4.1.0: Classification includes retention policy fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('retention_policy_id');",
+                  "    pm.expect(responseJson).to.have.property('retention_code');",
+                  "    pm.expect(responseJson).to.have.property('retention_type');",
+                  "    pm.expect(responseJson).to.have.property('min_retention_years');",
+                  "    pm.expect(responseJson).to.have.property('max_retention_years');",
+                  "    pm.expect(responseJson).to.have.property('legal_hold_flag');",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications/{{classification_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "classifications", "{{classification_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Classification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create classification returns 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Response has new classification ID', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('id');",
+                  "    pm.collectionVariables.set('new_classification_id', responseJson.id);",
+                  "});",
+                  "pm.test('Response has required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('id');",
+                  "    pm.expect(responseJson).to.have.property('classification_id');",
+                  "    pm.expect(responseJson).to.have.property('classification_code');",
+                  "    pm.expect(responseJson).to.have.property('name');",
+                  "    pm.expect(responseJson).to.have.property('code');",
+                  "    pm.expect(responseJson).to.have.property('status');",
+                  "});",
+                  "pm.test('🆕 v4.0.0: Classification includes template name', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('template_name');",
+                  "    if (responseJson.template_name !== null) {",
+                  "        pm.expect(responseJson.template_name).to.be.a('string');",
+                  "    }",
+                  "});",
+                  "pm.test('🆕 v4.1.0: Classification includes retention policy fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('retention_policy_id');",
+                  "    pm.expect(responseJson).to.have.property('retention_code');",
+                  "    pm.expect(responseJson).to.have.property('retention_type');",
+                  "    pm.expect(responseJson).to.have.property('min_retention_years');",
+                  "    pm.expect(responseJson).to.have.property('max_retention_years');",
+                  "    pm.expect(responseJson).to.have.property('legal_hold_flag');",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/classifications",
+              "host": ["{{base_url}}"],
+              "path": ["api", "classifications"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classification_code\": \"FIN-2025-001\",\n  \"name\": \"Financial Records\",\n  \"description\": \"Records related to financial transactions for 2025.\",\n  \"old_classification_id\": \"FIN-2024-001\",\n  \"retention_policy_id\": 1,\n  \"organization_id\": 2,\n  \"library_id\": 5,\n  \"condition_event\": \"Year End\",\n  \"condition_offset_days\": 30,\n  \"condition_type\": \"Time-based\",\n  \"destruction_method\": \"Shredding\",\n  \"condition\": \"No outstanding audits\",\n  \"vital\": \"Y\",\n  \"citation\": \"Finance Act 2025\",\n  \"see\": \"Audit Guidelines\",\n  \"file_type\": \"PDF\",\n  \"series\": \"Annual Reports\",\n  \"classification_level\": \"Confidential\",\n  \"sensitivity_rating\": 3,\n  \"media_type\": \"Digital\",\n  \"template_id\": 1,\n  \"classification_purpose\": \"Compliance\",\n  \"requires_tax_clearance\": true,\n  \"label_format\": \"Standard\",\n  \"secure\": \"Y\",\n  \"effective_date\": \"2025-01-01T00:00:00\",\n  \"record_owner_id\": 101,\n  \"record_owner\": \"John Doe\",\n  \"record_office\": \"Finance Office\",\n  \"purpose\": \"Annual financial compliance\",\n  \"active_storage\": \"Azure Blob Storage\",\n  \"is_active\": true,\n  \"created_by\": \"admin\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Classification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Update classification returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has updated classification ID', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('id', pm.variables.get('classification_id'));",
+                  "});",
+                  "pm.test('Response has required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('id');",
+                  "    pm.expect(responseJson).to.have.property('classification_id');",
+                  "    pm.expect(responseJson).to.have.property('classification_code');",
+                  "    pm.expect(responseJson).to.have.property('name');",
+                  "    pm.expect(responseJson).to.have.property('code');",
+                  "    pm.expect(responseJson).to.have.property('status');",
+                  "});",
+                  "pm.test('🆕 v4.0.0: Classification includes template name', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('template_name');",
+                  "    if (responseJson.template_name !== null) {",
+                  "        pm.expect(responseJson.template_name).to.be.a('string');",
+                  "    }",
+                  "});",
+                  "pm.test('🆕 v4.1.0: Classification includes retention policy fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('retention_policy_id');",
+                  "    pm.expect(responseJson).to.have.property('retention_code');",
+                  "    pm.expect(responseJson).to.have.property('retention_type');",
+                  "    pm.expect(responseJson).to.have.property('min_retention_years');",
+                  "    pm.expect(responseJson).to.have.property('max_retention_years');",
+                  "    pm.expect(responseJson).to.have.property('legal_hold_flag');",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/classifications/{{classification_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "classifications", "{{classification_id}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"classification_code\": \"string\",\n    \"name\": \"string\",\n    \"code\": \"string\",\n    \"status\": \"string\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Classification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Delete classification returns 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});",
+                  "pm.test('Response body is empty', function () {",
+                  "    pm.expect(pm.response.text()).to.be.empty;",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/classifications/{{classification_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "classifications", "{{classification_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Libraries",
+      "item": [
+        {
+          "name": "Get All Libraries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/libraries",
+              "host": ["{{base_url}}"],
+              "path": ["api", "libraries"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get all libraries returns 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has items array', function () {",
+                  "  const responseJson = pm.response.json();",
+                  "  pm.expect(responseJson).to.have.property('items');",
+                  "  pm.expect(responseJson.items).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Library by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/libraries/{{library_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "libraries", "{{library_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get library by ID returns 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Library has correct structure', function () {",
+                  "  const responseJson = pm.response.json();",
+                  "  pm.expect(responseJson).to.have.property('library_id');",
+                  "  pm.expect(responseJson).to.have.property('name');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Library",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Library\",\n  \"description\": \"Created via Postman\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/libraries",
+              "host": ["{{base_url}}"],
+              "path": ["api", "libraries"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Create library returns 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Created library has correct structure', function () {",
+                  "  const responseJson = pm.response.json();",
+                  "  pm.expect(responseJson).to.have.property('library_id');",
+                  "  pm.expect(responseJson).to.have.property('name');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Library",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Library\",\n  \"description\": \"Updated via Postman\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/libraries/{{library_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "libraries", "{{library_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Update library returns 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Updated library has correct structure', function () {",
+                  "  const responseJson = pm.response.json();",
+                  "  pm.expect(responseJson).to.have.property('library_id');",
+                  "  pm.expect(responseJson).to.have.property('name');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Library",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/libraries/{{library_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "libraries", "{{library_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Delete library returns 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Delete response has correct structure', function () {",
+                  "  const responseJson = pm.response.json();",
+                  "  pm.expect(responseJson).to.have.property('library_id');",
+                  "  pm.expect(responseJson).to.have.property('is_deleted');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Organization Hierarchy",
+      "item": [
+        {
+          "name": "Get All Organization Hierarchy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get all organization hierarchy returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has items array', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('items');",
+                  "    pm.expect(responseJson.items).to.be.an('array');",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstItem = responseJson.items[0];",
+                  "        pm.expect(firstItem).to.have.property('organization_id');",
+                  "        pm.expect(firstItem).to.have.property('name');",
+                  "        pm.expect(firstItem).to.have.property('code');",
+                  "        pm.expect(firstItem).to.have.property('description');",
+                  "        pm.expect(firstItem).to.have.property('org_level');",
+                  "        pm.expect(firstItem).to.have.property('parent_organization_id');",
+                  "        pm.expect(firstItem).to.have.property('hierarchy_path');",
+                  "        pm.expect(firstItem).to.have.property('level');",
+                  "    }",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/organization-hierarchy",
+              "host": ["{{base_url}}"],
+              "path": ["api", "organization-hierarchy"]
+            }
+          }
+        },
+        {
+          "name": "Get Stream and Business Unit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get stream and business unit returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has stream and business_unit fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('stream');",
+                  "    pm.expect(responseJson).to.have.property('business_unit');",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/organization/stream-business-unit/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "organization", "stream-business-unit", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Retention Policies",
+      "item": [
+        {
+          "name": "Get All Retention Policies",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get all retention policies returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has pagination structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('items');",
+                  "    pm.expect(responseJson).to.have.property('pagination');",
+                  "    pm.expect(responseJson).to.have.property('filters_applied');",
+                  "    pm.expect(responseJson).to.have.property('sort_info');",
+                  "    pm.expect(responseJson.items).to.be.an('array');",
+                  "});",
+                  "pm.test('Retention policies have required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstItem = responseJson.items[0];",
+                  "        pm.expect(firstItem).to.have.property('retention_policy_id');",
+                  "        pm.expect(firstItem).to.have.property('name');",
+                  "        pm.expect(firstItem).to.have.property('retention_code');",
+                  "        pm.expect(firstItem).to.have.property('retention_period_days');",
+                  "        pm.expect(firstItem).to.have.property('is_active');",
+                  "        pm.expect(firstItem).to.have.property('classifications_count');",
+                  "        pm.collectionVariables.set('retention_policy_id', firstItem.retention_policy_id);",
+                  "    }",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies?page=1&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Retention Policy by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get retention policy by ID returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Retention policy has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('retention_policy_id');",
+                  "    pm.expect(responseJson).to.have.property('name');",
+                  "    pm.expect(responseJson).to.have.property('description');",
+                  "    pm.expect(responseJson).to.have.property('retention_code');",
+                  "    pm.expect(responseJson).to.have.property('retention_period_days');",
+                  "    pm.expect(responseJson).to.have.property('is_active');",
+                  "    pm.expect(responseJson).to.have.property('classifications_count');",
+                  "    pm.expect(responseJson).to.have.property('created_at');",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies/{{retention_policy_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies", "{{retention_policy_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Create New Retention Policy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create retention policy returns 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Created retention policy has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('retention_policy_id');",
+                  "    pm.expect(responseJson).to.have.property('name');",
+                  "    pm.expect(responseJson).to.have.property('retention_code');",
+                  "    pm.expect(responseJson).to.have.property('retention_period_days');",
+                  "    pm.expect(responseJson).to.have.property('is_active');",
+                  "    pm.expect(responseJson).to.have.property('created_at');",
+                  "    pm.collectionVariables.set('created_retention_policy_id', responseJson.retention_policy_id);",
+                  "});",
+                  "pm.test('Created retention policy has correct values', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    const testCode = pm.collectionVariables.get('test_retention_code');",
+                  "    pm.expect(responseJson.retention_code).to.eql(testCode);",
+                  "    pm.expect(responseJson.name).to.eql('Test Retention Policy');",
+                  "    pm.expect(responseJson.retention_period_days).to.eql(2555);",
+                  "    pm.expect(responseJson.is_active).to.be.true;",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Retention Policy\",\n  \"description\": \"Test policy for API testing\",\n  \"retention_code\": \"{{test_retention_code}}\",\n  \"retention_period_days\": 2555,\n  \"applicable_data_types\": \"Documents, Records\",\n  \"jurisdiction\": \"Federal\",\n  \"legal_basis\": \"Test Regulation\",\n  \"disposition_method\": \"Secure Destruction\",\n  \"review_frequency\": \"Annual\",\n  \"policy_owner\": \"Test Owner\",\n  \"audit_required\": true,\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies"]
+            }
+          }
+        },
+        {
+          "name": "Update Retention Policy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Update retention policy returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Updated retention policy has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('retention_policy_id');",
+                  "    pm.expect(responseJson).to.have.property('name');",
+                  "    pm.expect(responseJson).to.have.property('description');",
+                  "    pm.expect(responseJson).to.have.property('modified_at');",
+                  "    pm.expect(responseJson).to.have.property('modified_by');",
+                  "});",
+                  "pm.test('Retention policy was updated correctly', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.name).to.eql('Updated Test Retention Policy');",
+                  "    pm.expect(responseJson.description).to.eql('Updated description for testing');",
+                  "    pm.expect(responseJson.retention_period_days).to.eql(3650);",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Test Retention Policy\",\n  \"description\": \"Updated description for testing\",\n  \"retention_period_days\": 3650,\n  \"applicable_data_types\": \"Documents, Records, Archives\",\n  \"jurisdiction\": \"Federal/State\",\n  \"legal_basis\": \"Updated Test Regulation\",\n  \"disposition_method\": \"Secure Shredding\",\n  \"review_frequency\": \"Biannual\",\n  \"policy_owner\": \"Updated Test Owner\",\n  \"audit_required\": true,\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies/{{created_retention_policy_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies", "{{created_retention_policy_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Retention Policy (Soft)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Delete retention policy returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Delete response has correct message', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('retention_policy_id');",
+                  "    pm.expect(responseJson).to.have.property('is_active');",
+                  "    pm.expect(responseJson.is_active).to.be.false;",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies/{{created_retention_policy_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies", "{{created_retention_policy_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Restore Retention Policy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Restore retention policy returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Restore response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('retention_policy_id');",
+                  "    pm.expect(responseJson).to.have.property('is_active');",
+                  "    pm.expect(responseJson.is_active).to.be.true;",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restored_by\": \"api_test_user\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies/{{created_retention_policy_id}}/restore",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies", "{{created_retention_policy_id}}", "restore"]
+            }
+          }
+        },
+        {
+          "name": "Retention Policies - Pagination & Filtering",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Retention policies pagination returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Advanced pagination structure validation', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('items');",
+                  "    pm.expect(responseJson).to.have.property('pagination');",
+                  "    pm.expect(responseJson).to.have.property('filters_applied');",
+                  "    pm.expect(responseJson).to.have.property('sort_info');",
+                  "    const pagination = responseJson.pagination;",
+                  "    pm.expect(pagination).to.have.property('page', 1);",
+                  "    pm.expect(pagination).to.have.property('size', 5);",
+                  "    pm.expect(pagination).to.have.property('total');",
+                  "    pm.expect(pagination).to.have.property('pages');",
+                  "    pm.expect(pagination).to.have.property('has_next');",
+                  "    pm.expect(pagination).to.have.property('has_previous', false);",
+                  "    const metadata = responseJson.filters_applied;",
+                  "    pm.expect(metadata).to.have.property('is_active', true);",
+                  "    pm.expect(metadata).to.have.property('min_retention_days', 1000);",
+                  "    const items = responseJson.items;",
+                  "    if (items.length > 0) {",
+                  "        items.forEach(item => {",
+                  "            pm.expect(item.is_active).to.be.true;",
+                  "            pm.expect(item.retention_period_days).to.be.at.least(1000);",
+                  "        });",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies?page=1&size=5&is_active=true&min_retention_days=1000&sort_by=retention_period_days&sort_order=desc",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "5" },
+                { "key": "is_active", "value": "true" },
+                { "key": "min_retention_days", "value": "1000" },
+                { "key": "sort_by", "value": "retention_period_days" },
+                { "key": "sort_order", "value": "desc" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Retention Policies - Search",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Retention policy search returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Search results are filtered', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('search_applied');",
+                  "    const items = responseJson.items;",
+                  "    const searchTerm = 'financial';",
+                  "    if (items.length > 0) {",
+                  "        const hasSearchTerm = items.some(item => ",
+                  "            item.name?.toLowerCase().includes(searchTerm) ||",
+                  "            item.description?.toLowerCase().includes(searchTerm) ||",
+                  "            item.retention_code?.toLowerCase().includes(searchTerm)",
+                  "        );",
+                  "        console.log('Search results found:', items.length);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies?page=1&size=20&search=financial&sort_by=name&sort_order=asc",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "20" },
+                { "key": "search", "value": "financial" },
+                { "key": "sort_by", "value": "name" },
+                { "key": "sort_order", "value": "asc" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Retention Policies Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Retention policies summary returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Summary has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('total_policies');",
+                  "    pm.expect(responseJson).to.have.property('active_policies');",
+                  "    pm.expect(responseJson).to.have.property('inactive_policies');",
+                  "    pm.expect(responseJson).to.have.property('avg_retention_days');",
+                  "    pm.expect(responseJson).to.have.property('min_retention_days');",
+                  "    pm.expect(responseJson).to.have.property('max_retention_days');",
+                  "});",
+                  "pm.test('Summary statistics are logical', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.total_policies).to.be.at.least(0);",
+                  "    pm.expect(responseJson.active_policies).to.be.at.most(responseJson.total_policies);",
+                  "    pm.expect(responseJson.inactive_policies).to.be.at.most(responseJson.total_policies);",
+                  "    if (responseJson.min_retention_days && responseJson.max_retention_days) {",
+                  "        pm.expect(responseJson.min_retention_days).to.be.at.most(responseJson.max_retention_days);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies/summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies", "summary"]
+            }
+          }
+        },
+        {
+          "name": "Get Retention Types",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get retention types returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Retention types response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('retention_types');",
+                  "    pm.expect(responseJson.retention_types).to.be.an('array');",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies/types",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies", "types"]
+            }
+          }
+        },
+        {
+          "name": "Get Jurisdictions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get jurisdictions returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Jurisdictions response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('jurisdictions');",
+                  "    pm.expect(responseJson.jurisdictions).to.be.an('array');",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/retention-policies/jurisdictions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "retention-policies", "jurisdictions"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lookups",
+      "item": [
+        {
+          "name": "Get All Lookup Types",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get lookup types returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has correct structure', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.have.property('items');",
+                  "    pm.expect(responseJson).to.have.property('total');",
+                  "    pm.expect(responseJson).to.have.property('page');",
+                  "    pm.expect(responseJson).to.have.property('size');",
+                  "    pm.expect(responseJson).to.have.property('pages');",
+                  "    pm.expect(responseJson.items).to.be.an('array');",
+                  "});",
+                  "pm.test('Lookup types have required fields', function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.items.length > 0) {",
+                  "        const firstItem = responseJson.items[0];",
+                  "        pm.expect(firstItem).to.have.property('lookup_type');",
+                  "        pm.expect(firstItem).to.have.property('display_name');",
+                  "        pm.expect(firstItem).to.have.property('is_active');",
+                  "        pm.collectionVariables.set('lookup_type', firstItem.lookup_type);",
+                  "    }",
+                  "});",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/lookups/types?page=1&size=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lookups", "types"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Templates",
+      "item": [
+        {
+          "name": "Create Template",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"template_name\": \"Sample Template\",\n  \"description\": \"A test template\",\n  \"version\": \"1.0\",\n  \"is_active\": true,\n  \"created_by\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/templates",
+              "host": ["{{base_url}}"],
+              "path": ["api", "templates"]
+            }
+          }
+        },
+        {
+          "name": "Get Template By ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/templates/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "templates", "1"]
+            }
+          }
+        },
+        {
+          "name": "List Templates",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/templates",
+              "host": ["{{base_url}}"],
+              "path": ["api", "templates"]
+            }
+          }
+        },
+        {
+          "name": "Update Template",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"template_name\": \"Updated Template\",\n  \"description\": \"Updated description\",\n  \"version\": \"2.0\",\n  \"is_active\": false,\n  \"modified_by\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/templates/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "templates", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Template",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/templates/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "templates", "1"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

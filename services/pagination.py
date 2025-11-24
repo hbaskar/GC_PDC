@@ -242,9 +242,9 @@ class AdvancedPagination:
         # Apply cursor filter if provided
         if cursor_value is not None:
             if sort_order == SortOrder.ASC:
-                query = query.filter(cursor_column > cursor_value)
+                query = query.filter(cursor_column >= cursor_value)
             else:
-                query = query.filter(cursor_column < cursor_value)
+                query = query.filter(cursor_column <= cursor_value)
         
         # Apply sorting by cursor field
         if sort_order == SortOrder.ASC:
@@ -258,18 +258,21 @@ class AdvancedPagination:
         # Determine if there are more pages
         has_next = len(items) > limit
         if has_next:
+            # Save the extra item for cursor
+            extra_item = items[-1]
             items = items[:-1]  # Remove extra item
-        
+        else:
+            extra_item = None
+
         # Generate cursors
         next_cursor = None
         previous_cursor = None
-        
-        if items:
-            if has_next:
-                next_cursor = str(getattr(items[-1], cursor_field))
-            if cursor_value is not None:
-                previous_cursor = str(getattr(items[0], cursor_field))
-        
+
+        if has_next and extra_item:
+            next_cursor = str(getattr(extra_item, cursor_field))
+        if items and cursor_value is not None:
+            previous_cursor = str(getattr(items[0], cursor_field))
+
         return items, next_cursor, previous_cursor
 
 def create_paginated_response(

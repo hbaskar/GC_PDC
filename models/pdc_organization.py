@@ -14,8 +14,8 @@ class PDCOrganization(Base):
     __tablename__ = "pdc_organizations"
     
     organization_id = Column(Integer, primary_key=True, nullable=False)
-    organization_name = Column(String(100), nullable=False, index=True)
-    organization_code = Column(String(50))
+    name = Column(String(100), nullable=False, index=True)
+    code = Column(String(50))
     description = Column(String(250))
     parent_organization_id = Column(Integer, ForeignKey("pdc_organizations.organization_id"))
     is_active = Column(Boolean, nullable=False, server_default=text('((1))'))
@@ -30,14 +30,14 @@ class PDCOrganization(Base):
     parent_organization = relationship("PDCOrganization", remote_side=[organization_id])
     
     def __repr__(self):
-        return f"<PDCOrganization(id={self.organization_id}, name='{self.organization_name}')>"
+        return f"<PDCOrganization(id={self.organization_id}, name='{self.name}')>"
     
     def to_dict(self):
         """Convert model instance to dictionary."""
         return {
             'organization_id': self.organization_id,
-            'organization_name': self.organization_name,
-            'organization_code': self.organization_code,
+            'name': self.name,
+            'code': self.code,
             'description': self.description,
             'parent_organization_id': self.parent_organization_id,
             'is_active': self.is_active,

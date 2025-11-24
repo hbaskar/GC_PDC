@@ -1,0 +1,28 @@
+import azure.functions as func
+import json
+import logging
+from database.config import get_db
+from services.organization_hierarchy_service import PDCOrganizationHierarchyService
+from schemas.organization_hierarchy_schemas import PDCOrganizationHierarchyResponse
+
+bp = func.Blueprint()
+
+@bp.route(route="organization-hierarchy", methods=["GET"])
+def get_organization_hierarchy(req: func.HttpRequest) -> func.HttpResponse:
+    """Get all organization hierarchy records."""
+    try:
+        db = next(get_db())
+        service = PDCOrganizationHierarchyService(db)
+        items = service.get_all_api()
+        return func.HttpResponse(
+            json.dumps({"items": items}, default=str),
+            status_code=200,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        logging.error(f"Error getting organization hierarchy: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({"error": "Failed to get organization hierarchy", "detail": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )

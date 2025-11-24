@@ -1,3 +1,33 @@
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class PDCTemplate(Base):
+    __tablename__ = 'pdc_templates'
+
+    template_id = Column(Integer, primary_key=True, autoincrement=True)
+    template_name = Column(String(100), nullable=False)
+    description = Column(String(250), nullable=True)
+    version = Column(String(20), nullable=True)
+    is_active = Column(Boolean, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    created_by = Column(String(100), nullable=False)
+    modified_at = Column(DateTime, nullable=True)
+    modified_by = Column(String(100), nullable=True)
+
+    def to_dict(self):
+        return {
+            'template_id': self.template_id,
+            'template_name': self.template_name,
+            'description': self.description,
+            'version': self.version,
+            'is_active': self.is_active,
+            'created_at': self.created_at,
+            'created_by': self.created_by,
+            'modified_at': self.modified_at,
+            'modified_by': self.modified_by,
+        }
 """
 PDC Template model.
 Manages template definitions for classifications.

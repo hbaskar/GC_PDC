@@ -78,6 +78,44 @@ def monitor_performance(endpoint_name: str):
                 raise
         return wrapper
     return decorator
+@bp.route(route="classifications/cursor", methods=["GET"])
+def get_classifications_cursor(req: func.HttpRequest) -> func.HttpResponse:
+    """Get classifications with cursor-based pagination only."""
+    try:
+        db = next(get_db())
+        service = PDCClassificationService(db)
+
+        # Parse pagination, filter, and search params
+        request_params = dict(req.params)
+        pagination = PaginationQueryParser.parse_pagination_params(request_params)
+        from services.pagination import PaginationType
+        pagination.pagination_type = PaginationType.CURSOR
+        filters = PaginationQueryParser.parse_filter_params(request_params)
+        search = request_params.get("search")
+        minimal = request_params.get("minimal", "false").lower() == "true"
+        fields = request_params.get("fields")
+        if fields:
+            fields = [f.strip() for f in fields.split(",") if f.strip()]
+
+        result = service.get_all_paginated_optimized(
+            pagination=pagination,
+            filters=filters,
+            search=search,
+            minimal=minimal,
+            fields=fields
+        )
+        return func.HttpResponse(
+            json.dumps(result, default=str),
+            status_code=200,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        logging.error(f"Error getting classifications (cursor): {str(e)}")
+        return func.HttpResponse(
+            json.dumps({"error": "Failed to get classifications (cursor)", "detail": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )
 @bp.route(route="classifications/summary", methods=["GET"])
 @monitor_performance("get_classifications_summary")
 def get_classifications_summary(req: func.HttpRequest) -> func.HttpResponse:
@@ -322,8 +360,8 @@ def create_classification(req: func.HttpRequest) -> func.HttpResponse:
         # Create classification
         new_classification = service.create(classification_data)
         
-        # Convert to API dict format using model's to_dict method
-        response_data = service.to_api_dict(new_classification)
+        # Convert to API dict format using schema enrichment (includes retention fields)
+        response_data = PDCClassificationResponse.from_orm_with_retention(new_classification).model_dump()
         return func.HttpResponse(
             json.dumps(response_data, default=str),
             status_code=201,
