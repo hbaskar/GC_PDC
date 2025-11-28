@@ -1,44 +1,55 @@
+
 import azure.functions as func
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+import json
 from models.pdc_template import PDCTemplate
 from schemas.template_schemas import PDCTemplateCreate, PDCTemplateUpdate, PDCTemplateOut
 from services.template_service import TemplateService
 from database import get_db
 
-router = APIRouter(prefix="/templates", tags=["templates"])
+bp = func.Blueprint()
 
-@router.post("/", response_model=PDCTemplateOut)
-def create_template(data: PDCTemplateCreate, db: Session = Depends(get_db)):
+@bp.route(route="templates", methods=["POST"])
+def create_template(req: func.HttpRequest) -> func.HttpResponse:
+    db = next(get_db())
+    data = req.get_json()
     service = TemplateService(db)
-    template = service.create(data)
-    return template
+    template = service.create(PDCTemplateCreate(**data))
+    return func.HttpResponse(json.dumps(template.to_dict()), mimetype="application/json", status_code=201)
 
-@router.get("/{template_id}", response_model=PDCTemplateOut)
-def get_template(template_id: int, db: Session = Depends(get_db)):
+@bp.route(route="templates/{template_id}", methods=["GET"])
+def get_template(req: func.HttpRequest) -> func.HttpResponse:
+    db = next(get_db())
+    template_id = int(req.route_params["template_id"])
     service = TemplateService(db)
     template = service.get_by_id(template_id)
     if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
-    return template
+        return func.HttpResponse(json.dumps({"detail": "Template not found"}), mimetype="application/json", status_code=404)
+    return func.HttpResponse(json.dumps(template.to_dict()), mimetype="application/json")
 
-@router.get("/", response_model=list[PDCTemplateOut])
-def list_templates(db: Session = Depends(get_db)):
+@bp.route(route="templates", methods=["GET"])
+def list_templates(req: func.HttpRequest) -> func.HttpResponse:
+    db = next(get_db())
     service = TemplateService(db)
-    return service.get_all()
+    templates = service.get_all()
+    return func.HttpResponse(json.dumps([t.to_dict() for t in templates]), mimetype="application/json")
 
-@router.put("/{template_id}", response_model=PDCTemplateOut)
-def update_template(template_id: int, data: PDCTemplateUpdate, db: Session = Depends(get_db)):
+@bp.route(route="templates/{template_id}", methods=["PUT"])
+def update_template(req: func.HttpRequest) -> func.HttpResponse:
+    db = next(get_db())
+    template_id = int(req.route_params["template_id"])
+    data = req.get_json()
     service = TemplateService(db)
-    template = service.update(template_id, data)
+    template = service.update(template_id, PDCTemplateUpdate(**data))
     if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
-    return template
+        return func.HttpResponse(json.dumps({"detail": "Template not found"}), mimetype="application/json", status_code=404)
+    return func.HttpResponse(json.dumps(template.to_dict()), mimetype="application/json")
 
-@router.delete("/{template_id}", response_model=dict)
-def delete_template(template_id: int, db: Session = Depends(get_db)):
+@bp.route(route="templates/{template_id}", methods=["DELETE"])
+def delete_template(req: func.HttpRequest) -> func.HttpResponse:
+    db = next(get_db())
+    template_id = int(req.route_params["template_id"])
     service = TemplateService(db)
     success = service.delete(template_id)
     if not success:
-        raise HTTPException(status_code=404, detail="Template not found")
-    return {"success": True}
+        return func.HttpResponse(json.dumps({"detail": "Template not found"}), mimetype="application/json", status_code=404)
+    return func.HttpResponse(json.dumps({"success": True}), mimetype="application/json")

@@ -1178,6 +1178,53 @@
               ]
             }
           }
+        },
+        {
+          "name": "Create Lookup Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lookup_type\": \"DOCUMENT_TYPE\",\n  \"display_name\": \"Document Type\",\n  \"description\": \"Type of document\",\n  \"is_active\": true,\n  \"created_by\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/lookups/types",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lookups", "types"]
+            }
+          }
+        },
+        {
+          "name": "Update Lookup Type",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"display_name\": \"Updated Document Type\",\n  \"description\": \"Updated description\",\n  \"is_active\": false,\n  \"modified_by\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/lookups/types/DOCUMENT_TYPE",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lookups", "types", "DOCUMENT_TYPE"]
+            }
+          }
+        },
+        {
+          "name": "Delete Lookup Type",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/lookups/types/DOCUMENT_TYPE",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lookups", "types", "DOCUMENT_TYPE"]
+            }
+          }
         }
       ]
     },

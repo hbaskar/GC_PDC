@@ -19,7 +19,7 @@ from blueprints.libraries import bp as libraries_bp
 
 from blueprints.organization_hierarchy import bp as organization_hierarchy_bp
 
-from blueprints.templates import router as templates_bp
+from blueprints.templates import bp as templates_bp
 from blueprints.organization import bp as organization_bp
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
