@@ -314,6 +314,64 @@ def get_lookup_codes_batch(req: func.HttpRequest) -> func.HttpResponse:
         logging.error(f"Get lookup codes batch failed: {str(e)}")
         return create_error_response("Failed to retrieve lookup codes", 500, str(e))
 
+@bp.route(route="lookups/codes", methods=["POST"])
+def create_lookup_code(req: func.HttpRequest) -> func.HttpResponse:
+    """Create a new lookup code."""
+    try:
+        db = next(get_db())
+        lookup_service = PDCLookupService(db)
+        data = req.get_json()
+        from schemas.lookup_schemas import PDCLookupCodeCreate
+        lookup_code_obj = PDCLookupCodeCreate(**data)
+        created = lookup_service.create_lookup_code(lookup_code_obj)
+        return create_success_response(lookup_service.to_api_dict_code(created), status_code=201)
+    except Exception as e:
+        logging.error(f"Create lookup code failed: {str(e)}")
+        return create_error_response("Failed to create lookup code", 500, str(e))
+
+@bp.route(route="lookups/codes/{lookup_type}/{lookup_code}", methods=["PUT"])
+def update_lookup_code(req: func.HttpRequest) -> func.HttpResponse:
+    """Update an existing lookup code."""
+    try:
+        db = next(get_db())
+        lookup_service = PDCLookupService(db)
+        lookup_type = req.route_params.get('lookup_type')
+        lookup_code = req.route_params.get('lookup_code')
+        data = req.get_json()
+        from schemas.lookup_schemas import PDCLookupCodeUpdate
+        update_obj = PDCLookupCodeUpdate(**data)
+        updated = lookup_service.update_lookup_code(
+            lookup_type,
+            lookup_code,
+            display_name=update_obj.display_name,
+            description=update_obj.description,
+            is_active=update_obj.is_active,
+            sort_order=update_obj.sort_order,
+            modified_by=update_obj.modified_by
+        )
+        if not updated:
+            return create_error_response("Lookup code not found", 404)
+        return create_success_response(lookup_service.to_api_dict_code(updated))
+    except Exception as e:
+        logging.error(f"Update lookup code failed: {str(e)}")
+        return create_error_response("Failed to update lookup code", 500, str(e))
+
+@bp.route(route="lookups/codes/{lookup_type}/{lookup_code}", methods=["DELETE"])
+def delete_lookup_code(req: func.HttpRequest) -> func.HttpResponse:
+    """Delete a lookup code."""
+    try:
+        db = next(get_db())
+        lookup_service = PDCLookupService(db)
+        lookup_type = req.route_params.get('lookup_type')
+        lookup_code = req.route_params.get('lookup_code')
+        deleted = lookup_service.delete_lookup_code(lookup_type, lookup_code)
+        if not deleted:
+            return create_error_response("Lookup code not found", 404)
+        return create_success_response({"success": True})
+    except Exception as e:
+        logging.error(f"Delete lookup code failed: {str(e)}")
+        return create_error_response("Failed to delete lookup code", 500, str(e))
+
 @bp.route(route="lookups/batch/codes/cursor", methods=["POST"])
 def get_lookup_codes_batch_cursor_paginated(req: func.HttpRequest) -> func.HttpResponse:
 
