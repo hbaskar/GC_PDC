@@ -51,14 +51,14 @@ def create_lookup_type(req: func.HttpRequest) -> func.HttpResponse:
         return create_error_response("Failed to create lookup type", 500, str(e))
 
 
-@bp.route(route="lookups/types/{lookup_type}", methods=["PUT"])
+@bp.route(route="lookups/types", methods=["PUT"])
 def update_lookup_type(req: func.HttpRequest) -> func.HttpResponse:
     """Update an existing lookup type."""
     try:
         db = next(get_db())
         lookup_service = PDCLookupService(db)
-        lookup_type = req.route_params.get('lookup_type')
         data = req.get_json()
+        lookup_type = data.get('lookup_type')
         from schemas.lookup_schemas import PDCLookupTypeUpdate
         update_obj = PDCLookupTypeUpdate(**data)
         updated = lookup_service.update_lookup_type(
@@ -329,15 +329,15 @@ def create_lookup_code(req: func.HttpRequest) -> func.HttpResponse:
         logging.error(f"Create lookup code failed: {str(e)}")
         return create_error_response("Failed to create lookup code", 500, str(e))
 
-@bp.route(route="lookups/codes/{lookup_type}/{lookup_code}", methods=["PUT"])
+@bp.route(route="lookups/codes", methods=["PUT"])
 def update_lookup_code(req: func.HttpRequest) -> func.HttpResponse:
     """Update an existing lookup code."""
     try:
         db = next(get_db())
         lookup_service = PDCLookupService(db)
-        lookup_type = req.route_params.get('lookup_type')
-        lookup_code = req.route_params.get('lookup_code')
         data = req.get_json()
+        lookup_type = data.get('lookup_type')
+        lookup_code = data.get('lookup_code')
         from schemas.lookup_schemas import PDCLookupCodeUpdate
         update_obj = PDCLookupCodeUpdate(**data)
         updated = lookup_service.update_lookup_code(

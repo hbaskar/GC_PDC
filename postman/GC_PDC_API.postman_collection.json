@@ -334,7 +334,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"code\": \"DOC_TYPE\",\n  \"name\": \"Document Type\"\n}"
+                "raw": "{\n  \"lookup_type\": \"DOC_TYPE\",\n  \"display_name\": \"Document Type\",\n  \"description\": \"Type for document classification\",\n  \"is_active\": true,\n  \"created_by\": \"admin\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/lookups/types",
@@ -352,13 +352,13 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Document Type\"\n}"
+                "raw": "{\n  \"lookup_type\": \"DOC_TYPE\",\n  \"display_name\": \"Updated Document Type\",\n  \"description\": \"Updated type for document classification\",\n  \"is_active\": true,\n  \"created_by\": \"admin\"\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/api/lookups/types/DOC_TYPE",
-              "host": ["{{base_url}}"],
-              "path": ["api", "lookups", "types", "DOC_TYPE"]
-            }
+              "url": {
+                "raw": "{{base_url}}/api/lookups/types",
+                "host": ["{{base_url}}"],
+                "path": ["api", "lookups", "types"]
+              }
           }
         },
         {
@@ -403,7 +403,7 @@
             ],
             "body": {
               "mode": "raw",
-                "raw": "{\n  \"code\": \"DOC_TYPE_001\",\n  \"lookup_code\": \"DOC_TYPE_001\",\n  \"name\": \"Document Type 001\",\n  \"lookup_type\": \"DOC_TYPE\",\n  \"created_by\": \"admin\"\n}"
+                "raw": "{\n  \"lookup_code\": \"DOC_TYPE_001\",\n  \"lookup_type\": \"DOC_TYPE\",\n  \"name\": \"Document Type 001\",\n  \"description\": \"Test code for document type\",\n  \"sort_order\": 1,\n  \"is_active\": true,\n  \"created_by\": \"admin\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/lookups/codes",
@@ -421,13 +421,13 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Document Type 001\"\n}"
+                "raw": "{\n  \"lookup_code\": \"DOC_TYPE_001\",\n  \"lookup_type\": \"DOC_TYPE\",\n  \"display_name\": \"Updated Document Type 001\",\n  \"description\": \"Updated test code for document type\",\n  \"sort_order\": 2,\n  \"is_active\": true,\n  \"created_by\": \"admin\"\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/api/lookups/codes/DOC_TYPE_001",
-              "host": ["{{base_url}}"],
-              "path": ["api", "lookups", "codes", "DOC_TYPE_001"]
-            }
+              "url": {
+                "raw": "{{base_url}}/api/lookups/codes",
+                "host": ["{{base_url}}"],
+                "path": ["api", "lookups", "codes"]
+              }
           }
         },
         {
