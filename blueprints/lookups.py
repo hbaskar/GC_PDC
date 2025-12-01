@@ -99,8 +99,17 @@ def get_lookup_types(req: func.HttpRequest) -> func.HttpResponse:
         # Parse query parameters
         page = int(req.params.get('page', 1))
         size = int(req.params.get('size', 50))
-        active_only = req.params.get('active_only', 'true').lower() == 'true'
         include_counts = req.params.get('include_counts', 'false').lower() == 'true'
+        # Robustly parse include_inactive_types from query params
+        raw_inactive = req.params.get('include_inactive_types', 'false')
+        if isinstance(raw_inactive, bool):
+            include_inactive_types = raw_inactive
+        elif isinstance(raw_inactive, str):
+            include_inactive_types = raw_inactive.strip().lower() in ('true', '1', 'yes')
+        else:
+            include_inactive_types = False
+        # Determine active_only based on include_inactive_types
+        active_only = not include_inactive_types
         # Validate pagination
         if page < 1 or size < 1 or size > 100:
             return create_error_response("Invalid pagination parameters", 400)
@@ -133,7 +142,8 @@ def get_lookup_types(req: func.HttpRequest) -> func.HttpResponse:
             "total": total,
             "page": page,
             "size": size,
-            "pages": pages
+            "pages": pages,
+            "include_inactive_types": include_inactive_types
         }
         return create_success_response(response_data)
     except Exception as e:
@@ -193,12 +203,20 @@ def get_lookup_codes_by_type(req: func.HttpRequest) -> func.HttpResponse:
         # Get search and other parameters
         search = request_params.get('search', '').strip() or None
         include_deleted = request_params.get('include_deleted', 'false').lower() in ('true', '1', 'yes')
-        # Get paginated results  
+        # Robustly parse include_inactive_types from query params
+        raw_inactive = request_params.get('include_inactive_types', False)
+        if isinstance(raw_inactive, bool):
+            include_inactive_types = raw_inactive
+        elif isinstance(raw_inactive, str):
+            include_inactive_types = raw_inactive.strip().lower() in ('true', '1', 'yes')
+        else:
+            include_inactive_types = False
+        # If include_inactive_types is set, include inactive codes
         result = lookup_service.get_by_type_paginated(
             lookup_type=lookup_type,
             pagination=pagination,
             search=search,
-            include_inactive=include_deleted
+            include_inactive=include_inactive_types or include_deleted
         )
         # Add lookup_type to response metadata
         result['lookup_type'] = lookup_type
@@ -295,7 +313,7 @@ def get_lookup_codes_batch(req: func.HttpRequest) -> func.HttpResponse:
             # Get codes for this type
             codes = lookup_service.get_lookup_codes_by_type(
                 lookup_type, 
-                active_only=active_only
+                    active_only=not include_inactive_types
             )
             
             # Build type response using model's to_dict() method

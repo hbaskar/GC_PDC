@@ -351,7 +351,12 @@ class PDCLookupService:
         include_inactive: bool = False
     ) -> Dict[str, Any]:
         """Get lookup codes for a specific type with pagination."""
+        import logging
         filters = {'lookup_type': lookup_type}
+        # Build the query and print the SQL before executing
+        query = self._build_base_query_codes(filters, search, include_inactive)
+        logging.info(f"[DEBUG] Lookup codes SQL: {str(query.statement.compile(compile_kwargs={'literal_binds': True}))}")
+        # Now run the paginated logic as before
         return self.get_lookup_codes_paginated(pagination, filters, search, include_inactive)
     
     def count_lookup_codes_by_type(self, lookup_type: str, active_only: bool = True) -> int:
