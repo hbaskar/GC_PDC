@@ -258,16 +258,13 @@
       "name": "Organization Hierarchy",
       "item": [
         {
-          "name": "Get Organization Hierarchy by Parent ID",
+          "name": "Get All Organization Hierarchy",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/api/organization-hierarchy?parent_organization_id=1",
+              "raw": "{{base_url}}/api/organization-hierarchy",
               "host": ["{{base_url}}"],
-              "path": ["api", "organization-hierarchy"],
-              "query": [
-                {"key": "parent_organization_id", "value": "1"}
-              ]
+              "path": ["api", "organization-hierarchy"]
             }
           }
         }
@@ -277,24 +274,13 @@
       "name": "Organizations",
       "item": [
         {
-          "name": "Get Organization by ID (Business Unit)",
+          "name": "Get Stream and Business Unit by Organization ID",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/api/organizations/business-unit/1",
+              "raw": "{{base_url}}/api/organization/stream-business-unit/1",
               "host": ["{{base_url}}"],
-              "path": ["api", "organizations", "business-unit", "1"]
-            }
-          }
-        },
-        {
-          "name": "Get Organization by ID (Stream)",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/api/organizations/stream/1",
-              "host": ["{{base_url}}"],
-              "path": ["api", "organizations", "stream", "1"]
+              "path": ["api", "organization", "stream-business-unit", "1"]
             }
           }
         }

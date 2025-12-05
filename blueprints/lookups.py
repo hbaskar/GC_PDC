@@ -38,8 +38,8 @@ def create_success_response(data: dict, status_code: int = 200) -> func.HttpResp
 @bp.route(route="lookups/types", methods=["POST"])
 def create_lookup_type(req: func.HttpRequest) -> func.HttpResponse:
     """Create a new lookup type."""
+    db = next(get_db())
     try:
-        db = next(get_db())
         lookup_service = PDCLookupService(db)
         data = req.get_json()
         from schemas.lookup_schemas import PDCLookupTypeCreate
@@ -49,13 +49,15 @@ def create_lookup_type(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"Create lookup type failed: {str(e)}")
         return create_error_response("Failed to create lookup type", 500, str(e))
+    finally:
+        db.close()
 
 
 @bp.route(route="lookups/types", methods=["PUT"])
 def update_lookup_type(req: func.HttpRequest) -> func.HttpResponse:
     """Update an existing lookup type."""
+    db = next(get_db())
     try:
-        db = next(get_db())
         lookup_service = PDCLookupService(db)
         data = req.get_json()
         lookup_type = data.get('lookup_type')
@@ -74,13 +76,15 @@ def update_lookup_type(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"Update lookup type failed: {str(e)}")
         return create_error_response("Failed to update lookup type", 500, str(e))
+    finally:
+        db.close()
 
 
 @bp.route(route="lookups/types/{lookup_type}", methods=["DELETE"])
 def delete_lookup_type(req: func.HttpRequest) -> func.HttpResponse:
     """Delete a lookup type."""
+    db = next(get_db())
     try:
-        db = next(get_db())
         lookup_service = PDCLookupService(db)
         lookup_type = req.route_params.get('lookup_type')
         deleted = lookup_service.delete_lookup_type(lookup_type)
@@ -90,11 +94,14 @@ def delete_lookup_type(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"Delete lookup type failed: {str(e)}")
         return create_error_response("Failed to delete lookup type", 500, str(e))
+    finally:
+        db.close()
 
 
 @bp.route(route="lookups/types", methods=["GET"])
 def get_lookup_types(req: func.HttpRequest) -> func.HttpResponse:
     """Get all lookup types with optional filtering."""
+    db = next(get_db())
     try:
         # Parse query parameters
         page = int(req.params.get('page', 1))
@@ -113,8 +120,6 @@ def get_lookup_types(req: func.HttpRequest) -> func.HttpResponse:
         # Validate pagination
         if page < 1 or size < 1 or size > 100:
             return create_error_response("Invalid pagination parameters", 400)
-        # Get database connection and service
-        db = next(get_db())
         lookup_service = PDCLookupService(db)
         # Get lookup types
         lookup_types = lookup_service.get_all_lookup_types(
@@ -149,18 +154,19 @@ def get_lookup_types(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"Get lookup types failed: {str(e)}")
         return create_error_response("Failed to retrieve lookup types", 500, str(e))
+    finally:
+        db.close()
 
 @bp.route(route="lookups/types/{lookup_type}", methods=["GET"])
 def get_lookup_type(req: func.HttpRequest) -> func.HttpResponse:
     """Get a specific lookup type with optional codes."""
+    db = next(get_db())
     try:
         lookup_type = req.route_params.get('lookup_type')
         include_codes = req.params.get('include_codes', 'false').lower() == 'true'
         active_codes_only = req.params.get('active_codes_only', 'true').lower() == 'true'
         if not lookup_type:
             return create_error_response("Lookup type is required", 400)
-        # Get database connection and service
-        db = next(get_db())
         lookup_service = PDCLookupService(db)
         # Get lookup type
         db_lookup_type = lookup_service.get_lookup_type(lookup_type)
@@ -182,18 +188,19 @@ def get_lookup_type(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"Get lookup type failed: {str(e)}")
         return create_error_response("Failed to retrieve lookup type", 500, str(e))
+    finally:
+        db.close()
 
 @bp.route(route="lookups/codes/{lookup_type}", methods=["GET"])
 def get_lookup_codes_by_type(req: func.HttpRequest) -> func.HttpResponse:
     """Get all lookup codes for a specific type with advanced pagination."""
+    db = next(get_db())
     try:
         lookup_type = req.route_params.get('lookup_type')
         if not lookup_type:
             return create_error_response("Lookup type is required", 400)
         # Parse query parameters for enhanced pagination
         request_params = dict(req.params)
-        # Get database connection
-        db = next(get_db())
         lookup_service = PDCLookupService(db)
         # Verify lookup type exists
         if not lookup_service.get_lookup_type(lookup_type):
@@ -224,6 +231,8 @@ def get_lookup_codes_by_type(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"Get lookup codes failed: {str(e)}")
         return create_error_response("Failed to retrieve lookup codes", 500, str(e))
+    finally:
+        db.close()
 
 @bp.route(route="lookups/codes", methods=["GET"])
 def get_all_lookup_codes(req: func.HttpRequest) -> func.HttpResponse:

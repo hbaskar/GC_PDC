@@ -34,3 +34,4 @@ app.register_blueprint(organization_hierarchy_bp)
 
 
 app.register_blueprint(templates_bp)
+app.register_blueprint(organization_bp)

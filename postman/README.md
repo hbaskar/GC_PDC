@@ -217,7 +217,7 @@ Perfect for large datasets, real-time feeds, and mobile applications.
 GET /api/classifications?pagination_type=cursor&size=20
 ```
 
-#### **Subsequent Cursor Requests:**
+#### **Subsequent Cursor Requests:********
 ```
 GET /api/classifications?pagination_type=cursor&size=20&cursor=eyJpZCI6MTIzNH0=
 ```
