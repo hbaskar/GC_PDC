@@ -10,5 +10,7 @@ class PDCOrganizationHierarchyResponse(BaseModel):
     parent_organization_id: Optional[int] = Field(None)
     hierarchy_path: Optional[str] = Field(None)
     level: Optional[int] = Field(None)
+    stream: Optional[str] = Field(None)
+    business_unit: Optional[str] = Field(None)
 
     model_config = {"extra": "allow"}

@@ -15,12 +15,7 @@ def get_organization_hierarchy(req: func.HttpRequest) -> func.HttpResponse:
         service = PDCOrganizationHierarchyService(db)
         org_level = req.params.get("org_level")
         if org_level:
-            from models.pdc_organization_hierarchy import PDCOrganizationHierarchy
-            from schemas.organization_hierarchy_schemas import PDCOrganizationHierarchyResponse
-            items = service.db.query(PDCOrganizationHierarchy).filter(
-                PDCOrganizationHierarchy.org_level == org_level
-            ).order_by(PDCOrganizationHierarchy.level).all()
-            items = [PDCOrganizationHierarchyResponse.model_validate(org.to_dict()).model_dump() for org in items]
+            items = service.get_api_by_org_level(org_level)
         else:
             items = service.get_all_api()
         return func.HttpResponse(
