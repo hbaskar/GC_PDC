@@ -301,6 +301,28 @@
           }
         },
         {
+          "name": "Get Lookup Types View",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/lookups/types-vw",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lookups", "types-vw"]
+            }
+          }
+        },
+        {
+          "name": "Get Lookup Codes View",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/lookups/codes-vw",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lookups", "codes-vw"]
+            }
+          }
+        },
+        {
           "name": "Get Lookup Type by Code",
           "request": {
             "method": "GET",

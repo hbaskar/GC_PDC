@@ -11,14 +11,14 @@ def get_stream_and_business_unit(req: func.HttpRequest) -> func.HttpResponse:
     """Get stream and business unit names for a given organization id."""
     try:
         organization_id = int(req.route_params.get("organization_id"))
-        db = next(get_db())
-        service = PDCOrganizationService(db)
-        result = service.get_stream_and_business_unit(organization_id)
-        return func.HttpResponse(
-            json.dumps(result, default=str),
-            status_code=200,
-            mimetype="application/json"
-        )
+        with get_db() as db:
+            service = PDCOrganizationService(db)
+            result = service.get_stream_and_business_unit(organization_id)
+            return func.HttpResponse(
+                json.dumps(result, default=str),
+                status_code=200,
+                mimetype="application/json"
+            )
     except Exception as e:
         logging.error(f"Error getting stream/business unit: {str(e)}")
         return func.HttpResponse(

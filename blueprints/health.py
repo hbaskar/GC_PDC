@@ -42,11 +42,9 @@ def health_check(req: func.HttpRequest) -> func.HttpResponse:
     """Basic health check endpoint."""
     try:
         # Test database connection
-        db = next(get_db())
-        
-        # Simple query to test connection
-        db.execute(text("SELECT 1")).fetchone()
-        db.close()
+        with get_db() as db:
+            # Simple query to test connection
+            db.execute(text("SELECT 1")).fetchone()
         
         health_data = {
             "status": "healthy",
@@ -86,9 +84,8 @@ def detailed_health_check(req: func.HttpRequest) -> func.HttpResponse:
         
         # Test database connection
         try:
-            db = next(get_db())
-            result = db.execute(text("SELECT @@VERSION")).fetchone()
-            db.close()
+            with get_db() as db:
+                result = db.execute(text("SELECT @@VERSION")).fetchone()
             
             health_data["components"]["database"] = {
                 "status": "healthy",

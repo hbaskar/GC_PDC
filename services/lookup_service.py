@@ -9,12 +9,14 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func, desc, asc
 
-from models import PDCLookupType, PDCLookupCode
+from models import PDCLookupType, PDCLookupCode, PDCLookupTypeView, PDCLookupCodeView
 from schemas.lookup_schemas import (
     PDCLookupTypeCreate, 
     PDCLookupTypeUpdate,
     PDCLookupCodeCreate,
-    PDCLookupCodeUpdate
+    PDCLookupCodeUpdate,
+    PDCLookupTypeViewResponse,
+    PDCLookupCodeViewResponse
 )
 from services.pagination import (
     AdvancedPagination, 
@@ -42,6 +44,27 @@ class PDCLookupService:
     def to_api_dict_code(self, lookup_code: PDCLookupCode) -> Dict[str, Any]:
         """Convert lookup code model to API response dictionary."""
         return lookup_code.to_dict()
+
+    def get_lookup_type_view(self, lookup_type: str) -> Optional[PDCLookupTypeView]:
+        """Get lookup type from pdc_lookup_types_vw view by lookup_type."""
+        return (
+            self.db.query(PDCLookupTypeView)
+            .filter(PDCLookupTypeView.lookup_type == lookup_type)
+            .first()
+        )
+
+    def get_lookup_codes_view(self, lookup_type: Optional[str] = None) -> List[dict]:
+        """Return lookup codes from view pdc_lookup_codes_vw, optionally filtered by lookup_type."""
+        query = self.db.query(PDCLookupCodeView)
+        if lookup_type:
+            query = query.filter(PDCLookupCodeView.lookup_type == lookup_type)
+        rows = query.all()
+        return [PDCLookupCodeViewResponse.model_validate(row.to_dict()).model_dump() for row in rows]
+
+    def get_lookup_types_view(self) -> List[dict]:
+        """Return lookup types from view pdc_lookup_types_vw."""
+        rows = self.db.query(PDCLookupTypeView).all()
+        return [PDCLookupTypeViewResponse.model_validate(row.to_dict()).model_dump() for row in rows]
 
     # ========================================
     # QUERY BUILDING AND FILTERING

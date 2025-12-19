@@ -19,14 +19,14 @@ def test_connection():
     """Test database connection."""
     try:
         print("🔗 Testing database connection...")
-        db = next(get_db())
-        result = db.execute(text("SELECT 1 as test")).fetchone()
-        if result and result[0] == 1:
-            print("✅ Database connection successful!")
-            return True
-        else:
-            print("❌ Database connection test failed")
-            return False
+        with get_db() as db:
+            result = db.execute(text("SELECT 1 as test")).fetchone()
+            if result and result[0] == 1:
+                print("✅ Database connection successful!")
+                return True
+            else:
+                print("❌ Database connection test failed")
+                return False
     except Exception as e:
         print(f"❌ Database connection error: {e}")
         return False
@@ -35,30 +35,29 @@ def test_table_access():
     """Test access to actual pdc_classifications table."""
     try:
         print("📋 Testing table access...")
-        db = next(get_db())
-        
-        # Get basic table info
-        result = db.execute(text("SELECT COUNT(*) FROM pdc_classifications")).fetchone()
-        total_count = result[0]
-        print(f"📊 Total classifications in table: {total_count}")
-        
-        # Get sample data
-        result = db.execute(text("""
-            SELECT TOP 3 
-                classification_id, 
-                name, 
-                code, 
-                classification_level,
-                is_active
-            FROM pdc_classifications 
-            ORDER BY classification_id
-        """)).fetchall()
-        
-        print("📄 Sample records:")
-        for row in result:
-            print(f"  ID: {row[0]} | Name: {row[1]} | Code: {row[2]} | Level: {row[3]} | Active: {row[4]}")
-        
-        return True
+        with get_db() as db:
+            # Get basic table info
+            result = db.execute(text("SELECT COUNT(*) FROM pdc_classifications")).fetchone()
+            total_count = result[0]
+            print(f"📊 Total classifications in table: {total_count}")
+            
+            # Get sample data
+            result = db.execute(text("""
+                SELECT TOP 3 
+                    classification_id, 
+                    name, 
+                    code, 
+                    classification_level,
+                    is_active
+                FROM pdc_classifications 
+                ORDER BY classification_id
+            """)).fetchall()
+            
+            print("📄 Sample records:")
+            for row in result:
+                print(f"  ID: {row[0]} | Name: {row[1]} | Code: {row[2]} | Level: {row[3]} | Active: {row[4]}")
+            
+            return True
         
     except Exception as e:
         print(f"❌ Error accessing table: {e}")
@@ -68,27 +67,27 @@ def test_crud_operations():
     """Test service operations using the service layer."""
     try:
         print("🔧 Testing service operations...")
-        db = next(get_db())
-        service = PDCClassificationService(db)
-        
-        # Test get_all
-        classifications, total = service.get_all(limit=5)
-        print(f"✅ get_all(): Found {total} total records, retrieved {len(classifications)}")
-        
-        if classifications:
-            first_record = classifications[0]
+        with get_db() as db:
+            service = PDCClassificationService(db)
             
-            # Test get_by_id
-            retrieved = service.get_by_id(first_record.classification_id)
-            if retrieved:
-                print(f"✅ get_by_id(): Retrieved '{retrieved.name}' (ID: {retrieved.classification_id})")
+            # Test get_all
+            classifications, total = service.get_all(limit=5)
+            print(f"✅ get_all(): Found {total} total records, retrieved {len(classifications)}")
             
-            # Test get_by_code
-            retrieved_by_code = service.get_by_code(first_record.code)
-            if retrieved_by_code:
-                print(f"✅ get_by_code(): Retrieved '{retrieved_by_code.name}' (Code: {retrieved_by_code.code})")
-        
-        return True
+            if classifications:
+                first_record = classifications[0]
+                
+                # Test get_by_id
+                retrieved = service.get_by_id(first_record.classification_id)
+                if retrieved:
+                    print(f"✅ get_by_id(): Retrieved '{retrieved.name}' (ID: {retrieved.classification_id})")
+                
+                # Test get_by_code
+                retrieved_by_code = service.get_by_code(first_record.code)
+                if retrieved_by_code:
+                    print(f"✅ get_by_code(): Retrieved '{retrieved_by_code.name}' (Code: {retrieved_by_code.code})")
+            
+            return True
         
     except Exception as e:
         print(f"❌ Error testing service operations: {e}")
@@ -98,21 +97,21 @@ def test_metadata_operations():
     """Test metadata endpoint operations."""
     try:
         print("📊 Testing metadata operations...")
-        db = next(get_db())
-        service = PDCClassificationService(db)
-        
-        # Test metadata methods
-        levels = service.get_classification_levels()
-        media_types = service.get_media_types()
-        file_types = service.get_file_types()
-        series = service.get_series()
-        
-        print(f"✅ Classification levels: {levels[:3]}{'...' if len(levels) > 3 else ''}")
-        print(f"✅ Media types: {media_types[:3]}{'...' if len(media_types) > 3 else ''}")
-        print(f"✅ File types: {file_types[:3]}{'...' if len(file_types) > 3 else ''}")
-        print(f"✅ Series: {series[:3]}{'...' if len(series) > 3 else ''}")
-        
-        return True
+        with get_db() as db:
+            service = PDCClassificationService(db)
+            
+            # Test metadata methods
+            levels = service.get_classification_levels()
+            media_types = service.get_media_types()
+            file_types = service.get_file_types()
+            series = service.get_series()
+            
+            print(f"✅ Classification levels: {levels[:3]}{'...' if len(levels) > 3 else ''}")
+            print(f"✅ Media types: {media_types[:3]}{'...' if len(media_types) > 3 else ''}")
+            print(f"✅ File types: {file_types[:3]}{'...' if len(file_types) > 3 else ''}")
+            print(f"✅ Series: {series[:3]}{'...' if len(series) > 3 else ''}")
+            
+            return True
         
     except Exception as e:
         print(f"❌ Error testing metadata operations: {e}")

@@ -44,31 +44,31 @@ def get_retention_policies(req: func.HttpRequest) -> func.HttpResponse:
     """Get all retention policies with pagination, filtering, and search."""
     try:
         # Get database session
-        db = next(get_db())
-        service = PDCRetentionPolicyService(db)
-        
-        # Parse query parameters
-        request_params = dict(req.params)
-        
-        # Parse pagination parameters
-        pagination = service.parse_pagination_params(request_params)
-        
-        # Parse filter parameters
-        filters = service.parse_filter_params(request_params)
-        
-        # Get search parameter
-        search = request_params.get('search', '').strip()
-        include_deleted = request_params.get('include_inactive', 'false').lower() == 'true'
-        
-        # Get paginated results
-        result = service.get_all_paginated(
-            pagination=pagination,
-            filters=filters if filters else None,
-            search=search if search else None,
-            include_deleted=include_deleted
-        )
-        
-        return create_success_response(result)
+        with get_db() as db:
+            service = PDCRetentionPolicyService(db)
+            
+            # Parse query parameters
+            request_params = dict(req.params)
+            
+            # Parse pagination parameters
+            pagination = service.parse_pagination_params(request_params)
+            
+            # Parse filter parameters
+            filters = service.parse_filter_params(request_params)
+            
+            # Get search parameter
+            search = request_params.get('search', '').strip()
+            include_deleted = request_params.get('include_inactive', 'false').lower() == 'true'
+            
+            # Get paginated results
+            result = service.get_all_paginated(
+                pagination=pagination,
+                filters=filters if filters else None,
+                search=search if search else None,
+                include_deleted=include_deleted
+            )
+            
+            return create_success_response(result)
         
     except Exception as e:
         logging.error(f"Get retention policies failed: {str(e)}")
@@ -81,18 +81,18 @@ def get_retention_policy(req: func.HttpRequest) -> func.HttpResponse:
         policy_id = int(req.route_params.get('policy_id'))
         
         # Get database session
-        db = next(get_db())
-        service = PDCRetentionPolicyService(db)
-        
-        # Get the retention policy
-        policy = service.get_by_id(policy_id)
-        if not policy:
-            return create_error_response("Retention policy not found", 404)
-        
-        # Enrich with statistics and serialize
-        enriched_data = service._enrich_policy_with_stats(policy)
-        response_data = PDCRetentionPolicyResponse.model_validate(enriched_data).model_dump()
-        return create_success_response(response_data)
+        with get_db() as db:
+            service = PDCRetentionPolicyService(db)
+            
+            # Get the retention policy
+            policy = service.get_by_id(policy_id)
+            if not policy:
+                return create_error_response("Retention policy not found", 404)
+            
+            # Enrich with statistics and serialize
+            enriched_data = service._enrich_policy_with_stats(policy)
+            response_data = PDCRetentionPolicyResponse.model_validate(enriched_data).model_dump()
+            return create_success_response(response_data)
         
     except ValueError:
         return create_error_response("Invalid retention policy ID", 400)
@@ -120,23 +120,23 @@ def create_retention_policy(req: func.HttpRequest) -> func.HttpResponse:
             return create_error_response("Validation error", 400, str(e))
         
         # Get database session
-        db = next(get_db())
-        service = PDCRetentionPolicyService(db)
-        
-        # Check if retention code already exists (if provided)
-        if policy_data.retention_code:
-            existing = service.get_by_code(policy_data.retention_code)
-            if existing:
-                return create_error_response("Retention policy with this code already exists", 409)
-        
-        # Create the retention policy
-        new_policy = service.create(policy_data)
-        
-        # Enrich and serialize response
-        enriched_data = service._enrich_policy_with_stats(new_policy)
-        response_data = PDCRetentionPolicyResponse.model_validate(enriched_data).model_dump()
-        
-        return create_success_response(response_data, 201)
+        with get_db() as db:
+            service = PDCRetentionPolicyService(db)
+            
+            # Check if retention code already exists (if provided)
+            if policy_data.retention_code:
+                existing = service.get_by_code(policy_data.retention_code)
+                if existing:
+                    return create_error_response("Retention policy with this code already exists", 409)
+            
+            # Create the retention policy
+            new_policy = service.create(policy_data)
+            
+            # Enrich and serialize response
+            enriched_data = service._enrich_policy_with_stats(new_policy)
+            response_data = PDCRetentionPolicyResponse.model_validate(enriched_data).model_dump()
+            
+            return create_success_response(response_data, 201)
         
     except Exception as e:
         logging.error(f"Create retention policy failed: {str(e)}")
@@ -164,24 +164,24 @@ def update_retention_policy(req: func.HttpRequest) -> func.HttpResponse:
             return create_error_response("Validation error", 400, str(e))
         
         # Get database session
-        db = next(get_db())
-        service = PDCRetentionPolicyService(db)
-        
-        # Check if retention code already exists (if being updated)
-        if policy_data.retention_code:
-            existing = service.get_by_code(policy_data.retention_code)
-            if existing and existing.retention_policy_id != policy_id:
-                return create_error_response("Retention policy with this code already exists", 409)
-        
-        # Update the retention policy
-        updated_policy = service.update(policy_id, policy_data)
-        if not updated_policy:
-            return create_error_response("Retention policy not found", 404)
-        
-        # Enrich and serialize response
-        enriched_data = service._enrich_policy_with_stats(updated_policy)
-        response_data = PDCRetentionPolicyResponse.model_validate(enriched_data).model_dump()
-        return create_success_response(response_data)
+        with get_db() as db:
+            service = PDCRetentionPolicyService(db)
+            
+            # Check if retention code already exists (if being updated)
+            if policy_data.retention_code:
+                existing = service.get_by_code(policy_data.retention_code)
+                if existing and existing.retention_policy_id != policy_id:
+                    return create_error_response("Retention policy with this code already exists", 409)
+            
+            # Update the retention policy
+            updated_policy = service.update(policy_id, policy_data)
+            if not updated_policy:
+                return create_error_response("Retention policy not found", 404)
+            
+            # Enrich and serialize response
+            enriched_data = service._enrich_policy_with_stats(updated_policy)
+            response_data = PDCRetentionPolicyResponse.model_validate(enriched_data).model_dump()
+            return create_success_response(response_data)
         
     except ValueError:
         return create_error_response("Invalid retention policy ID", 400)
@@ -197,28 +197,28 @@ def delete_retention_policy(req: func.HttpRequest) -> func.HttpResponse:
         force_delete = req.params.get('force', 'false').lower() == 'true'
         
         # Get database session
-        db = next(get_db())
-        service = PDCRetentionPolicyService(db)
-        
-        if force_delete:
-            # Hard delete
-            try:
-                success = service.delete(policy_id)
-                if not success:
+        with get_db() as db:
+            service = PDCRetentionPolicyService(db)
+            
+            if force_delete:
+                # Hard delete
+                try:
+                    success = service.delete(policy_id)
+                    if not success:
+                        return create_error_response("Retention policy not found", 404)
+                    
+                    return create_success_response({"message": "Retention policy permanently deleted"})
+                except ValueError as e:
+                    return create_error_response(str(e), 409)
+            else:
+                # Soft delete
+                deleted_policy = service.soft_delete(policy_id, "api_user")
+                if not deleted_policy:
                     return create_error_response("Retention policy not found", 404)
                 
-                return create_success_response({"message": "Retention policy permanently deleted"})
-            except ValueError as e:
-                return create_error_response(str(e), 409)
-        else:
-            # Soft delete
-            deleted_policy = service.soft_delete(policy_id, "api_user")
-            if not deleted_policy:
-                return create_error_response("Retention policy not found", 404)
-            
-            enriched_data = service._enrich_policy_with_stats(deleted_policy)
-            response_data = PDCRetentionPolicyResponse.model_validate(enriched_data).model_dump()
-            return create_success_response(response_data)
+                enriched_data = service._enrich_policy_with_stats(deleted_policy)
+                response_data = PDCRetentionPolicyResponse.model_validate(enriched_data).model_dump()
+                return create_success_response(response_data)
         
     except ValueError:
         return create_error_response("Invalid retention policy ID", 400)
@@ -242,17 +242,17 @@ def restore_retention_policy(req: func.HttpRequest) -> func.HttpResponse:
             pass  # Use default if JSON parsing fails
         
         # Get database session
-        db = next(get_db())
-        service = PDCRetentionPolicyService(db)
-        
-        # Restore the retention policy
-        restored_policy = service.restore(policy_id, restored_by)
-        if not restored_policy:
-            return create_error_response("Retention policy not found", 404)
-        
-        enriched_data = service._enrich_policy_with_stats(restored_policy)
-        response_data = PDCRetentionPolicyResponse.model_validate(enriched_data).model_dump()
-        return create_success_response(response_data)
+        with get_db() as db:
+            service = PDCRetentionPolicyService(db)
+            
+            # Restore the retention policy
+            restored_policy = service.restore(policy_id, restored_by)
+            if not restored_policy:
+                return create_error_response("Retention policy not found", 404)
+            
+            enriched_data = service._enrich_policy_with_stats(restored_policy)
+            response_data = PDCRetentionPolicyResponse.model_validate(enriched_data).model_dump()
+            return create_success_response(response_data)
         
     except ValueError:
         return create_error_response("Invalid retention policy ID", 400)
@@ -265,17 +265,17 @@ def get_retention_policies_summary(req: func.HttpRequest) -> func.HttpResponse:
     """Get retention policy summary statistics."""
     try:
         # Get database session
-        db = next(get_db())
-        service = PDCRetentionPolicyService(db)
-        
-        # Parse filter parameters for summary
-        request_params = dict(req.params)
-        filters = service.parse_filter_params(request_params)
-        
-        # Get summary statistics
-        summary = service.get_summary_statistics(filters if filters else None)
-        
-        return create_success_response(summary)
+        with get_db() as db:
+            service = PDCRetentionPolicyService(db)
+            
+            # Parse filter parameters for summary
+            request_params = dict(req.params)
+            filters = service.parse_filter_params(request_params)
+            
+            # Get summary statistics
+            summary = service.get_summary_statistics(filters if filters else None)
+            
+            return create_success_response(summary)
         
     except Exception as e:
         logging.error(f"Get retention policies summary failed: {str(e)}")
@@ -286,13 +286,13 @@ def get_retention_types(req: func.HttpRequest) -> func.HttpResponse:
     """Get all unique retention types."""
     try:
         # Get database session
-        db = next(get_db())
-        service = PDCRetentionPolicyService(db)
-        
-        # Get retention types
-        types = service.get_retention_types()
-        
-        return create_success_response({"retention_types": types})
+        with get_db() as db:
+            service = PDCRetentionPolicyService(db)
+            
+            # Get retention types
+            types = service.get_retention_types()
+            
+            return create_success_response({"retention_types": types})
         
     except Exception as e:
         logging.error(f"Get retention types failed: {str(e)}")
@@ -303,13 +303,13 @@ def get_jurisdictions(req: func.HttpRequest) -> func.HttpResponse:
     """Get all unique jurisdictions."""
     try:
         # Get database session
-        db = next(get_db())
-        service = PDCRetentionPolicyService(db)
-        
-        # Get jurisdictions
-        jurisdictions = service.get_jurisdictions()
-        
-        return create_success_response({"jurisdictions": jurisdictions})
+        with get_db() as db:
+            service = PDCRetentionPolicyService(db)
+            
+            # Get jurisdictions
+            jurisdictions = service.get_jurisdictions()
+            
+            return create_success_response({"jurisdictions": jurisdictions})
         
     except Exception as e:
         logging.error(f"Get jurisdictions failed: {str(e)}")

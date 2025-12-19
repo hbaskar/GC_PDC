@@ -10,8 +10,8 @@ from .base import Base
 
 
 # Import all models
-from .pdc_lookup_type import PDCLookupType
-from .pdc_lookup_code import PDCLookupCode
+from .pdc_lookup_type import PDCLookupType, PDCLookupTypeView
+from .pdc_lookup_code import PDCLookupCode, PDCLookupCodeView
 from .pdc_classification import PDCClassification
 from .pdc_retention_policy import PDCRetentionPolicy
 from .pdc_template import PDCTemplate
@@ -26,7 +26,9 @@ __all__ = [
     
     # Models
     'PDCLookupType',
+    'PDCLookupTypeView',
     'PDCLookupCode',
+    'PDCLookupCodeView',
     'PDCClassification',
     'PDCRetentionPolicy',
     'PDCTemplate',

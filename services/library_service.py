@@ -8,8 +8,10 @@ class PDCLibraryService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, name: str, description: Optional[str] = None) -> PDCLibrary:
-        library = PDCLibrary(name=name, description=description)
+    def create(self, code: str, name: str, description: Optional[str] = None, library_group_id: Optional[int] = None, created_by: Optional[str] = None) -> PDCLibrary:
+        group_id = library_group_id if library_group_id is not None else 0
+        creator = created_by if created_by else 'system'
+        library = PDCLibrary(code=code, name=name, description=description, library_group_id=group_id, created_by=creator)
         self.db.add(library)
         self.db.commit()
         self.db.refresh(library)
@@ -21,14 +23,20 @@ class PDCLibraryService:
     def get_all(self) -> List[PDCLibrary]:
         return self.db.query(PDCLibrary).all()
 
-    def update(self, library_id: int, name: Optional[str] = None, description: Optional[str] = None) -> Optional[PDCLibrary]:
+    def update(self, library_id: int, code: Optional[str] = None, name: Optional[str] = None, description: Optional[str] = None, library_group_id: Optional[int] = None, modified_by: Optional[str] = None) -> Optional[PDCLibrary]:
         library = self.get_by_id(library_id)
         if not library:
             return None
+        if code:
+            library.code = code
+        if library_group_id is not None:
+            library.library_group_id = library_group_id
         if name:
             library.name = name
         if description:
             library.description = description
+        if modified_by:
+            library.modified_by = modified_by
         library.modified_at = datetime.utcnow()
         self.db.commit()
         self.db.refresh(library)

@@ -217,6 +217,9 @@ class PDCClassificationResponse(BaseModel):
                     data[field] = value.isoformat()
                 else:
                     data[field] = value
+        # Backfill API-facing code field when model uses `code`
+        if data.get('classification_code') is None:
+            data['classification_code'] = getattr(obj, 'code', None)
         # Add retention policy fields
         rp = getattr(obj, 'retention_policy', None)
         if rp:

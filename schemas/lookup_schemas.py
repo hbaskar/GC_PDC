@@ -35,6 +35,26 @@ class PDCLookupTypeResponse(PDCLookupTypeBase):
     
     model_config = {"from_attributes": True, "extra": "allow"}
 
+
+class PDCLookupTypeViewResponse(BaseModel):
+    """Schema for lookup type view response."""
+    lookup_type: str
+    display_name: Optional[str] = None
+    is_active: Optional[bool] = None
+    
+    model_config = {"from_attributes": True, "extra": "allow"}
+
+
+class PDCLookupCodeViewResponse(BaseModel):
+    """Schema for lookup code view response."""
+    lookup_type: str
+    lookup_code: str
+    display_name: Optional[str] = None
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+    model_config = {"from_attributes": True, "extra": "allow"}
+
 # ========== LOOKUP CODE SCHEMAS ==========
 
 class PDCLookupCodeBase(BaseModel):

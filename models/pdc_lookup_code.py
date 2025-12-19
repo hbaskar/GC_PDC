@@ -54,3 +54,23 @@ class PDCLookupCode(Base):
             'modified_at': self.modified_at.isoformat() if self.modified_at else None,
             'modified_by': self.modified_by
         }
+
+
+class PDCLookupCodeView(Base):
+    """Model for pdc_lookup_codes_vw view."""
+    __tablename__ = 'pdc_lookup_codes_vw'
+
+    lookup_type = Column(String(50), primary_key=True, nullable=False)
+    lookup_code = Column(String(50), primary_key=True, nullable=False)
+    display_name = Column(String(100), nullable=True)
+    is_active = Column(Boolean, nullable=True)
+    sort_order = Column(Integer, nullable=True)
+
+    def to_dict(self):
+        return {
+            'lookup_type': self.lookup_type,
+            'lookup_code': self.lookup_code,
+            'display_name': self.display_name,
+            'is_active': self.is_active,
+            'sort_order': self.sort_order
+        }

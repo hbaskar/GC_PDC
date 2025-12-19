@@ -94,12 +94,11 @@ def diagnostic_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         try:
             from database.config import get_db
             
-            db = next(get_db())
-            diagnostic_info["connection_test"] = {
-                "session_creation": "SUCCESS",
-                "session_type": str(type(db))
-            }
-            db.close()
+            with get_db() as db:
+                diagnostic_info["connection_test"] = {
+                    "session_creation": "SUCCESS",
+                    "session_type": str(type(db))
+                }
             
         except Exception as e:
             diagnostic_info["connection_test"] = {

@@ -3,6 +3,7 @@ Database configuration for Azure SQL Server connection using SQLAlchemy ORM.
 Supports both SQL authentication and Managed Identity authentication.
 """
 import os
+from contextlib import contextmanager
 from urllib.parse import quote_plus
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -218,8 +219,9 @@ def get_session_local():
     return _SessionLocal
 
 
+@contextmanager
 def get_db():
-    """Dependency to get database session."""
+    """Provide a session that always closes to avoid pool exhaustion."""
     SessionLocal = get_session_local()
     db = SessionLocal()
     try:
